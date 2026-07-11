@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Student, QuestionGroup, Question } from '../types';
 import { QUESTION_GROUPS, getQuestionsList } from '../questionsData';
 import { calculateProgressPercent, formatGPS } from '../utils';
@@ -10,17 +10,27 @@ import {
 } from 'lucide-react';
 
 // ============================================================
-// 🔥 KOMPONEN PHOTO UPLOAD (INTEGRASI DI DALAM FILE INI)
+// 🔥 KOMPONEN PHOTO UPLOAD
 // ============================================================
 interface PhotoUploadProps {
   studentNis: string;
   studentName: string;
+  questionId: string;
+  questionLabel: string;
   onPhotoUploaded: (fileId: string, fileUrl: string) => void;
   onPhotoError: (error: string) => void;
   existingPhotoUrl?: string | null;
 }
 
-function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, existingPhotoUrl }: PhotoUploadProps) {
+function PhotoUpload({ 
+  studentNis, 
+  studentName, 
+  questionId,
+  questionLabel,
+  onPhotoUploaded, 
+  onPhotoError, 
+  existingPhotoUrl 
+}: PhotoUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -28,11 +38,12 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🔥 Format nama file: NIS-Nama-FOTO
-  const generateFileName = (nis: string, name: string) => {
+  // 🔥 Format nama file: NIS-Nama-Pertanyaan (contoh: 20261001-AHMAD_ADI-FOTO_SELFIE)
+  const generateFileName = (nis: string, name: string, qLabel: string, fileExt: string) => {
     const cleanName = name.replace(/\s+/g, '_').toUpperCase();
+    const cleanQuestion = qLabel.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
     const timestamp = new Date().getTime();
-    return `${nis}-${cleanName}-FOTO_${timestamp}`;
+    return `${nis}-${cleanName}-${cleanQuestion}_${timestamp}.${fileExt}`;
   };
 
   // 🔥 Konversi File ke Base64 untuk preview
@@ -45,38 +56,86 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
     });
   };
 
-  // 🔥 Upload ke Google Drive via Apps Script
-  const uploadToDrive = async (file: File, fileName: string) => {
-    const base64Data = await fileToBase64(file);
-    const payload = {
-      action: 'uploadPhoto',
-      fileName: fileName,
-      fileType: file.type,
-      fileData: base64Data,
-      studentNis: studentNis,
-      studentName: studentName
-    };
+  // 🔥 Upload ke Google Drive via Apps Script dengan folder tujuan
 
-    const url = localStorage.getItem('mpls_google_sheets_url') || '';
-    if (!url) {
-      throw new Error('URL Google Sheets belum diset');
-    }
+  // const uploadToDrive = async (file: File, fileName: string) => {
+  //   const base64Data = await fileToBase64(file);
+  //   const payload = {
+  //     action: 'uploadPhoto',
+  //     fileName: fileName,
+  //     fileType: file.type,
+  //     fileData: base64Data,
+  //     studentNis: studentNis,
+  //     studentName: studentName,
+  //     questionId: questionId,
+  //     // 🔥 Folder tujuan di Google Drive
+  //     folderId: '1XEBJqayQCIfJPkIApRjggOBIZrHss52V'
+  //   };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload)
-    });
+  //   const url = localStorage.getItem('mpls_google_sheets_url') || '';
+  //   if (!url) {
+  //     throw new Error('URL Google Sheets belum diset');
+  //   }
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error: ${response.status}`);
-    }
+  //   const response = await fetch(url, {
+  //     method: 'POST',
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //     },
+  //     body: JSON.stringify(payload)
+  //   });
 
-    const result = await response.json();
-    return result;
+  //   if (!response.ok) {
+  //     throw new Error(`HTTP Error: ${response.status}`);
+  //   }
+
+  //   const result = await response.json();
+  //   return result;
+  // };
+
+
+  // 🔥 Upload ke Google Drive via Apps Script dengan folder tujuan
+const uploadToDrive = async (file: File, fileName: string) => {
+  const base64Data = await fileToBase64(file);
+  const payload = {
+    action: 'uploadPhoto',
+    fileName: fileName,
+    fileType: file.type,
+    fileData: base64Data,
+    studentNis: studentNis,
+    studentName: studentName,
+    questionId: questionId,
+    folderId: '1XEBJqayQCIfJPkIApRjggOBIZrHss52V' // 🔥 PASTIKAN FOLDER ID INI BENAR
   };
+
+  const url = localStorage.getItem('mpls_google_sheets_url') || '';
+  if (!url) {
+    throw new Error('URL Google Sheets belum diset');
+  }
+
+  console.log('📤 Upload payload:', {
+    fileName: fileName,
+    fileSize: file.size,
+    questionId: questionId,
+    folderId: payload.folderId
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP Error: ${response.status}`);
+  }
+
+  const result = await response.json();
+  console.log('📥 Upload response:', result);
+  return result;
+};
 
   // 🔥 Handle File Selection
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,8 +148,14 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      onPhotoError('Ukuran file maksimal 5MB!');
+    // 🔥 Validasi ukuran file 100 KB - 500 KB
+    const fileSizeKB = file.size / 1024;
+    if (fileSizeKB < 100) {
+      onPhotoError(`Ukuran file terlalu kecil (${Math.round(fileSizeKB)} KB). Minimal 100 KB!`);
+      return;
+    }
+    if (fileSizeKB > 500) {
+      onPhotoError(`Ukuran file terlalu besar (${Math.round(fileSizeKB)} KB). Maksimal 500 KB!`);
       return;
     }
 
@@ -129,7 +194,8 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
         });
       }, 300);
 
-      const fileName = generateFileName(studentNis, studentName);
+      const fileExt = photoFile.name.split('.').pop() || 'jpg';
+      const fileName = generateFileName(studentNis, studentName, questionLabel, fileExt);
       const result = await uploadToDrive(photoFile, fileName);
 
       clearInterval(progressInterval);
@@ -138,7 +204,7 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
       if (result.status === 'success') {
         setUploadStatus('success');
         onPhotoUploaded(result.fileId || 'local', result.fileUrl || photoPreview || '');
-        alert('✅ Foto berhasil diupload!');
+        alert('✅ Foto berhasil diupload ke Google Drive!');
       } else {
         throw new Error(result.message || 'Upload gagal');
       }
@@ -196,7 +262,7 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
           <div className="space-y-2">
             <Camera className="w-10 h-10 text-[#8A8A70] mx-auto" />
             <p className="text-sm font-medium text-[#33332D]">Klik untuk upload foto</p>
-            <p className="text-xs text-[#8A8A70]">Format: JPG, PNG, GIF (Maks. 5MB)</p>
+            <p className="text-xs text-[#8A8A70]">Format: JPG, PNG (100 KB - 500 KB)</p>
           </div>
         )}
         <input
@@ -262,7 +328,9 @@ function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, e
         <div className="text-xs text-[#8A8A70] bg-[#F5F5F0] p-2 rounded-lg">
           <span className="font-semibold">File:</span> {photoFile.name}
           <br />
-          <span className="font-semibold">Akan disimpan sebagai:</span> {generateFileName(studentNis, studentName)}.{photoFile.name.split('.').pop()}
+          <span className="font-semibold">Ukuran:</span> {Math.round(photoFile.size / 1024)} KB
+          <br />
+          <span className="font-semibold">Akan disimpan sebagai:</span> {generateFileName(studentNis, studentName, questionLabel, photoFile.name.split('.').pop() || 'jpg')}
         </div>
       )}
     </div>
@@ -286,10 +354,9 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showAllErrors, setShowAllErrors] = useState(false);
 
-  // 🔥 State untuk foto
-  const [photoFileId, setPhotoFileId] = useState<string | null>(null);
-  const [photoFileUrl, setPhotoFileUrl] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
+  // 🔥 State untuk foto per pertanyaan
+  const [photoStates, setPhotoStates] = useState<Record<string, { fileId: string | null, fileUrl: string | null }>>({});
+  const [photoErrors, setPhotoErrors] = useState<Record<string, string>>({});
 
   // Auto-set the Read-Only questions on mount
   useEffect(() => {
@@ -299,35 +366,57 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
       q2: student.nis
     }));
     
-    // Cek apakah ada foto yang sudah tersimpan
-    if (student.answers.photo_file_id) {
-      setPhotoFileId(student.answers.photo_file_id);
-      setPhotoFileUrl(student.answers.photo_file_url || null);
-    }
+    // Cek foto yang sudah tersimpan
+    const photoQuestions = ['q6', 'q9', 'q29'];
+    photoQuestions.forEach(qId => {
+      if (student.answers[`${qId}_file_id`]) {
+        setPhotoStates(prev => ({
+          ...prev,
+          [qId]: {
+            fileId: student.answers[`${qId}_file_id`],
+            fileUrl: student.answers[`${qId}_file_url`] || null
+          }
+        }));
+      }
+    });
   }, [student]);
 
   const questions = getQuestionsList();
-
-  // Progress of current answers
   const currentProgressPercent = calculateProgressPercent(answers, questions);
 
   // 🔥 Handler untuk photo upload
-  const handlePhotoUploaded = (fileId: string, fileUrl: string) => {
-    setPhotoFileId(fileId);
-    setPhotoFileUrl(fileUrl);
+  const handlePhotoUploaded = (questionId: string, fileId: string, fileUrl: string) => {
+    setPhotoStates(prev => ({
+      ...prev,
+      [questionId]: { fileId, fileUrl }
+    }));
+    
     // Simpan ke answers
     const updatedAnswers = { 
       ...answers, 
-      photo_file_id: fileId, 
-      photo_file_url: fileUrl 
+      [`${questionId}_file_id`]: fileId, 
+      [`${questionId}_file_url`]: fileUrl 
     };
     setAnswers(updatedAnswers);
+    
+    // Hapus error untuk pertanyaan ini
+    setPhotoErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[questionId];
+      return newErrors;
+    });
   };
 
   // 🔥 Handler untuk photo error
-  const handlePhotoError = (error: string) => {
-    setPhotoError(error);
-    setTimeout(() => setPhotoError(null), 5000);
+  const handlePhotoError = (questionId: string, error: string) => {
+    setPhotoErrors(prev => ({ ...prev, [questionId]: error }));
+    setTimeout(() => {
+      setPhotoErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[questionId];
+        return newErrors;
+      });
+    }, 5000);
   };
 
   // Validate a single field
@@ -346,6 +435,14 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
       }
       if (Array.isArray(value) && value.length === 0) {
         return 'Pilih minimal satu opsi';
+      }
+    }
+
+    // 🔥 Validasi khusus untuk file upload (q6, q9, q29)
+    if (q.type === 'file' && q.required) {
+      const fileId = photoStates[q.id]?.fileId;
+      if (!fileId) {
+        return 'Foto wajib diupload!';
       }
     }
 
@@ -449,7 +546,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
     }
   };
 
-  // Mock Upload Selector
+  // Mock Upload Selector (untuk testing)
   const handleSimulatedUpload = (questionId: string, sizeInKB: number, fileName: string) => {
     if (sizeInKB < 100 || sizeInKB > 500) {
       alert(`Gagal unggah: Ukuran file ${sizeInKB} KB di luar batas yang diperbolehkan (100 KB - 500 KB)`);
@@ -504,20 +601,25 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
     }
   };
 
-  // Save progress draft
+  // 🔥 Save progress draft - DIPERBAIKI
   const handleSaveDraft = () => {
     // 🔥 Sertakan data foto dalam answers
-    const fullAnswers = {
-      ...answers,
-      photo_file_id: photoFileId,
-      photo_file_url: photoFileUrl
-    };
+    const fullAnswers = { ...answers };
+    
+    // Tambahkan data foto dari photoStates
+    Object.keys(photoStates).forEach(qId => {
+      if (photoStates[qId].fileId) {
+        fullAnswers[`${qId}_file_id`] = photoStates[qId].fileId;
+        fullAnswers[`${qId}_file_url`] = photoStates[qId].fileUrl;
+      }
+    });
+    
     onSave(fullAnswers, false);
-    setSuccessMsg('Draft pendaftaran berhasil disimpan sementara!');
+    setSuccessMsg('✅ Draft pendaftaran berhasil disimpan dan disinkronkan ke Google Sheets!');
     setTimeout(() => setSuccessMsg(null), 3000);
   };
 
-  // Final submit
+  // 🔥 Final submit - DIPERBAIKI
   const handleFinalSubmit = () => {
     const allErrors: Record<string, string> = {};
     let isValid = true;
@@ -537,7 +639,6 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
 
     if (!isValid) {
       setShowAllErrors(true);
-      // Find which group has the first error
       const firstErrorId = Object.keys(allErrors)[0];
       const faultyGroup = QUESTION_GROUPS.find(g => g.questions.some(q => q.id === firstErrorId));
       if (faultyGroup) {
@@ -546,19 +647,23 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
           document.getElementById(`field-container-${firstErrorId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 200);
       }
-      alert('Pendaftaran gagal dikirim! Silakan periksa kembali semua tab, ada isian wajib yang belum terisi atau tidak memenuhi kriteria validasi.');
+      alert('❌ Pendaftaran gagal dikirim! Silakan periksa kembali semua tab, ada isian wajib yang belum terisi.');
       return;
     }
 
     // 🔥 Sertakan data foto dalam answers
-    const fullAnswers = {
-      ...answers,
-      photo_file_id: photoFileId,
-      photo_file_url: photoFileUrl
-    };
+    const fullAnswers = { ...answers };
+    
+    // Tambahkan data foto dari photoStates
+    Object.keys(photoStates).forEach(qId => {
+      if (photoStates[qId].fileId) {
+        fullAnswers[`${qId}_file_id`] = photoStates[qId].fileId;
+        fullAnswers[`${qId}_file_url`] = photoStates[qId].fileUrl;
+      }
+    });
     
     onSave(fullAnswers, true);
-    alert('Sukses! Data pendaftaran MPLS Anda berhasil dikirim secara penuh.');
+    alert('✅ Sukses! Data pendaftaran MPLS Anda berhasil dikirim secara penuh dan disimpan ke Google Sheets.');
     onClose();
   };
 
@@ -580,7 +685,13 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
       if (isApplicable) {
         total++;
         const val = answers[q.id];
-        if (val !== undefined && val !== null && val !== '') {
+        
+        // 🔥 Untuk file upload, cek photoStates
+        if (q.type === 'file') {
+          if (photoStates[q.id]?.fileId) {
+            filled++;
+          }
+        } else if (val !== undefined && val !== null && val !== '') {
           if (Array.isArray(val)) {
             if (val.length > 0) filled++;
           } else {
@@ -612,7 +723,6 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
             </div>
           </div>
 
-          {/* Quick Stats */}
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 bg-[#4A4A35] px-3 py-1.5 rounded-full border border-[#5A5A40]/30">
               <span className="text-xs text-[#E5E5D8]">Total Progres:</span>
@@ -653,10 +763,9 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
           </div>
         )}
 
-        {/* Form Layout: Sidebar Navigation & Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* Sidebar Menu - Sticky for desktop */}
+          {/* Sidebar Menu */}
           <div className="lg:col-span-4 lg:sticky lg:top-20 z-10 space-y-4">
             <div className="bg-white rounded-2xl border border-[#D6D6C2] p-4 shadow-xs">
               <h3 className="text-xs font-bold text-[#8A8A70] uppercase tracking-wider mb-3 px-2">Kategori Pertanyaan</h3>
@@ -702,17 +811,19 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
               </nav>
             </div>
 
-            {/* Hint Box */}
             <div className="bg-[#FFFBEB] border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 shadow-xs space-y-2">
               <div className="flex items-center gap-2 font-bold text-amber-900">
                 <AlertCircle className="w-4 h-4 shrink-0 text-amber-800" />
                 <span>Petunjuk Pengisian</span>
               </div>
               <p className="leading-relaxed">
-                Anda dapat menyimpan progres pengisian data kapan saja dengan mengeklik tombol <strong>Simpan Draft</strong>. Data Anda akan disimpan dan dapat dilanjutkan nanti dengan memasukkan kembali NIS Anda.
+                Anda dapat menyimpan progres pengisian data kapan saja dengan mengeklik tombol <strong>Simpan Draft</strong>. Data Anda akan disimpan dan dapat dilanjutkan nanti.
               </p>
               <p className="leading-relaxed font-semibold">
                 * Kolom nama dan NIS adalah bawaan sistem yang bersifat terkunci (read-only).
+              </p>
+              <p className="leading-relaxed text-amber-700">
+                📸 <strong>Upload Foto:</strong> Format JPG/PNG, ukuran 100 KB - 500 KB.
               </p>
             </div>
           </div>
@@ -724,7 +835,6 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
 
               return (
                 <div key={group.id} className="divide-y divide-[#E0E0D6]">
-                  {/* Section Header */}
                   <div className="p-6 bg-[#F5F5F0]">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 rounded-xl bg-[#5A5A40] text-white">
@@ -738,11 +848,11 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                     </div>
                   </div>
 
-                  {/* Questions Grid */}
                   <div className="p-6 space-y-6">
                     {group.questions.map((q) => {
                       const value = answers[q.id];
                       const error = validationErrors[q.id];
+                      const photoError = photoErrors[q.id];
 
                       // Dependency logic check
                       let isVisible = true;
@@ -759,15 +869,18 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
 
                       if (!isVisible) return null;
 
-                      // Read-only logic for Name & NIS
                       const isReadOnly = q.id === 'q1' || q.id === 'q2';
+                      
+                      // 🔥 Cek apakah ini pertanyaan file upload
+                      const isFileQuestion = q.type === 'file';
+                      const isPhotoQuestion = ['q6', 'q9', 'q29'].includes(q.id);
 
                       return (
                         <div 
                           key={q.id} 
                           id={`field-container-${q.id}`}
                           className={`space-y-2 p-4 rounded-xl border transition-all ${
-                            error 
+                            error || photoError
                               ? 'border-red-200 bg-red-50/20' 
                               : 'border-[#F5F5F0] hover:border-[#D6D6C2]'
                           }`}
@@ -785,17 +898,17 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                             )}
                           </div>
 
-                          {/* ========================================================== */}
-                          {/* 🔥 UPLOAD FOTO - KHUSUS UNTUK Q98 (FOTO SISWA) */}
-                          {/* ========================================================== */}
-                          {q.id === 'q98' ? (
+                          {/* 🔥 UPLOAD FOTO - UNTUK q6, q9, q29 */}
+                          {isPhotoQuestion ? (
                             <div className="space-y-2">
                               <PhotoUpload
                                 studentNis={student.nis}
                                 studentName={student.name}
-                                onPhotoUploaded={handlePhotoUploaded}
-                                onPhotoError={handlePhotoError}
-                                existingPhotoUrl={photoFileUrl}
+                                questionId={q.id}
+                                questionLabel={q.text}
+                                onPhotoUploaded={(fileId, fileUrl) => handlePhotoUploaded(q.id, fileId, fileUrl)}
+                                onPhotoError={(error) => handlePhotoError(q.id, error)}
+                                existingPhotoUrl={photoStates[q.id]?.fileUrl}
                               />
                               {photoError && (
                                 <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
@@ -803,9 +916,9 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                   <span>{photoError}</span>
                                 </div>
                               )}
-                              {photoFileId && (
+                              {photoStates[q.id]?.fileId && (
                                 <div className="text-[10px] text-emerald-600 bg-emerald-50 p-2 rounded-lg">
-                                  ✅ Foto sudah terupload (ID: {photoFileId.substring(0, 20)}...)
+                                  ✅ Foto sudah terupload (ID: {photoStates[q.id].fileId?.substring(0, 20)}...)
                                 </div>
                               )}
                             </div>
@@ -934,7 +1047,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                 </div>
                               )}
                             </div>
-                          ) : q.type === 'file' ? (
+                          ) : q.type === 'file' && !isPhotoQuestion ? (
                             <div className="space-y-3">
                               {value ? (
                                 <div className="flex items-center justify-between p-3 bg-[#EEF9F1] border border-emerald-200 rounded-xl">
@@ -1007,10 +1120,10 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                             </div>
                           ) : null}
 
-                          {error && (
+                          {(error || photoError) && (
                             <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              <span>{error}</span>
+                              <span>{error || photoError}</span>
                             </div>
                           )}
                         </div>
@@ -1018,7 +1131,6 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                     })}
                   </div>
 
-                  {/* Tab Stepper Controls */}
                   <div className="p-6 bg-[#F5F5F0] flex items-center justify-between">
                     <button
                       type="button"

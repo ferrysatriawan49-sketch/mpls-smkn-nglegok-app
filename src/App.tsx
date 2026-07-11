@@ -221,21 +221,20 @@ export default function App() {
   }, [googleSheetsUrl]);
 
   // ============================================================
-  // 🔥 REFRESH OTOMATIS SETIAP 30 DETIK (KETIKA DI DESKTOP)
+  // 🔥 REFRESH OTOMATIS SETIAP 60 DETIK
   // ============================================================
   useEffect(() => {
-    // Hanya jalankan refresh otomatis jika tidak ada student yang login
     if (!selectedStudent && !loginStudent) {
-      // Bersihkan interval lama
       if (refreshInterval) {
         clearInterval(refreshInterval);
       }
       
-      // Buat interval baru
       const interval = setInterval(() => {
         console.log('🔄 Refresh otomatis data dari Google Sheets...');
-        refreshDataFromSheets();
-      }, 30000); // 30 detik
+        if (!isAutoSyncing && !isSyncing) {
+          refreshDataFromSheets();
+        }
+      }, 60000);
       
       setRefreshInterval(interval);
       
@@ -245,13 +244,12 @@ export default function App() {
         }
       };
     } else {
-      // Jika ada student login, hentikan refresh otomatis
       if (refreshInterval) {
         clearInterval(refreshInterval);
         setRefreshInterval(null);
       }
     }
-  }, [selectedStudent, loginStudent]);
+  }, [selectedStudent, loginStudent, isAutoSyncing, isSyncing]);
 
   // ============================================================
   // 5. SEMUA FUNGSI
@@ -313,11 +311,17 @@ export default function App() {
       const result = await response.json();
       
       if (result.status === 'success' && result.students && result.students.length > 0) {
-        // Update data tanpa mengganggu user yang sedang login
-        setStudents(result.students);
-        localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
-        localStorage.setItem('mpls_initial_load_done', 'true');
-        console.log(`✅ Refresh berhasil: ${result.students.length} data siswa dimuat`);
+        const currentData = JSON.stringify(students);
+        const newData = JSON.stringify(result.students);
+        
+        if (currentData !== newData) {
+          console.log('🔄 Ada perubahan data, update...');
+          setStudents(result.students);
+          localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
+          localStorage.setItem('mpls_initial_load_done', 'true');
+        } else {
+          console.log('ℹ️ Refresh: Tidak ada perubahan data');
+        }
       } else {
         console.log('ℹ️ Refresh: Tidak ada data baru');
       }
@@ -526,7 +530,7 @@ export default function App() {
   };
 
   // ============================================================
-  // 🔥 FUNGSI SYNC KE GOOGLE SHEETS (DENGAN DEBOUNCE)
+  // 🔥 FUNGSI SYNC KE GOOGLE SHEETS
   // ============================================================
   const syncToGoogleSheets = useCallback(async (studentsToSync: Student[]) => {
     if (!googleSheetsUrl || !googleSheetsUrl.trim().startsWith('http')) {
@@ -597,20 +601,26 @@ export default function App() {
   }, [googleSheetsUrl]);
 
   // ============================================================
-  // 🔥 SAVE STUDENTS TO DB (DENGAN DEBOUNCE)
+  // 🔥 SAVE STUDENTS TO DB (DENGAN FORCE SYNC)
   // ============================================================
-  const saveStudentsToDB = useCallback((updatedStudents: Student[]) => {
+  const saveStudentsToDB = useCallback((updatedStudents: Student[], forceSync: boolean = false) => {
+    console.log('💾 Menyimpan data siswa:', updatedStudents.length, 'data, forceSync:', forceSync);
+    
     setStudents(updatedStudents);
     localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(updatedStudents));
     
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-    
-    syncTimeoutRef.current = setTimeout(() => {
+    if (forceSync) {
       syncToGoogleSheets(updatedStudents);
-      syncTimeoutRef.current = null;
-    }, 500);
+    } else {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      
+      syncTimeoutRef.current = setTimeout(() => {
+        syncToGoogleSheets(updatedStudents);
+        syncTimeoutRef.current = null;
+      }, 500);
+    }
     
     setSaveStatus('saving');
     setIsSaving(true);
@@ -803,7 +813,7 @@ export default function App() {
     };
 
     const nextList = [newStudent, ...students];
-    saveStudentsToDB(nextList);
+    saveStudentsToDB(nextList, true);
     setNewStudentName('');
     setNewStudentNis('');
     setShowAddModal(false);
@@ -820,19 +830,118 @@ export default function App() {
     }
     if (confirm(`Apakah Anda yakin ingin menghapus siswa "${studentName}"?`)) {
       const updated = students.filter(s => s.id !== studentId);
-      saveStudentsToDB(updated);
+      saveStudentsToDB(updated, true);
       alert(`Siswa ${studentName} berhasil dihapus.`);
     }
   };
 
+// ============================================================
+// 🔥 HANDLE SAVE STUDENT ANSWERS - DENGAN FORMAT FOTO
+// ============================================================
+const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boolean) => {
+  if (!selectedStudent) return;
+
+  const questions = getQuestionsList();
+  const progressPercent = calculateProgressPercent(answers, questions);
+  
+  let progressState: 'not_started' | 'in_progress' | 'completed' = 'not_started';
+  if (isSubmitted || progressPercent === 100) {
+    progressState = 'completed';
+  } else if (progressPercent > 0) {
+    progressState = 'in_progress';
+  }
+
+  // 🔥 Pastikan data foto tersimpan dengan format yang benar
+  const updated = students.map(s => {
+    if (s.id === selectedStudent.id) {
+      const updatedAnswers = { ...answers };
+      updatedAnswers.q2 = selectedStudent.nis;
+      
+      // 🔥 Simpan informasi foto ke spreadsheet
+      // Format: PHOTO_ID: {fileId} | PHOTO_URL: {fileUrl}
+      if (answers.photo_file_id) {
+        updatedAnswers[`${answers.photo_question_id}_file_id`] = answers.photo_file_id;
+        updatedAnswers[`${answers.photo_question_id}_file_url`] = answers.photo_file_url;
+      }
+      
+      return {
+        ...s,
+        progress: progressState,
+        progressPercent,
+        answers: updatedAnswers,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    return s;
+  });
+
+  saveStudentsToDB(updated, true);
+  
+  const updatedSelected = updated.find(s => s.id === selectedStudent.id);
+  if (updatedSelected) {
+    setSelectedStudent(updatedSelected);
+  }
+};
+
+
+
   // ============================================================
-  // 🔥 HANDLE STUDENT LOGIN - MODIFIED: HIDE NIS
+  // 🔥 HANDLE STUDENT LOGIN - DENGAN LOAD DATA DARI SHEETS
   // ============================================================
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginStudent) return;
 
     if (nisPassword === loginStudent.nis) {
+      // 🔥 SEBELUM MASUK, REFRESH DATA DARI SHEETS
+      console.log('🔄 Memuat data terbaru dari Google Sheets untuk siswa:', loginStudent.name);
+      
+      try {
+        const url = googleSheetsUrl;
+        if (url && url.startsWith('http')) {
+          let response;
+          try {
+            response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ action: 'fetchStudents' })
+            });
+          } catch (postErr) {
+            const getUrl = url.includes('?') 
+              ? `${url}&action=fetchStudents` 
+              : `${url}?action=fetchStudents`;
+            response = await fetch(getUrl, { method: 'GET' });
+          }
+
+          if (response && response.ok) {
+            const result = await response.json();
+            if (result.status === 'success' && result.students) {
+              // 🔥 UPDATE DATA SISWA DARI SHEETS
+              setStudents(result.students);
+              localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
+              console.log('✅ Data siswa berhasil dimuat dari Google Sheets');
+              
+              // 🔥 CARI SISWA YANG LOGIN DENGAN DATA TERBARU
+              const updatedStudent = result.students.find((s: Student) => s.nis === loginStudent.nis);
+              if (updatedStudent) {
+                // Gunakan data terbaru dari sheets
+                setSelectedStudent(updatedStudent);
+                setLoginStudent(null);
+                setNisPassword('');
+                setLoginError(null);
+                console.log('✅ Data siswa terbaru dimuat:', updatedStudent);
+                return;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Gagal memuat data dari sheets, gunakan data lokal:', err);
+      }
+      
+      // Fallback ke data lokal jika fetch gagal
       setSelectedStudent(loginStudent);
       setLoginStudent(null);
       setNisPassword('');
@@ -842,45 +951,7 @@ export default function App() {
     }
   };
 
-  // ============================================================
-  // 🔥 HANDLE SAVE STUDENT ANSWERS (DENGAN AUTO-UPDATE)
-  // ============================================================
-  const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boolean) => {
-    if (!selectedStudent) return;
 
-    const questions = getQuestionsList();
-    const progressPercent = calculateProgressPercent(answers, questions);
-    
-    let progressState: 'not_started' | 'in_progress' | 'completed' = 'not_started';
-    if (isSubmitted || progressPercent === 100) {
-      progressState = 'completed';
-    } else if (progressPercent > 0) {
-      progressState = 'in_progress';
-    }
-
-    // 🔥 Update data siswa
-    const updated = students.map(s => {
-      if (s.id === selectedStudent.id) {
-        return {
-          ...s,
-          progress: progressState,
-          progressPercent,
-          answers,
-          lastUpdated: new Date().toISOString()
-        };
-      }
-      return s;
-    });
-
-    // 🔥 Simpan dengan debounce (akan auto-sync ke Google Sheets)
-    saveStudentsToDB(updated);
-    
-    // 🔥 Update selectedStudent agar form tetap sinkron
-    const updatedSelected = updated.find(s => s.id === selectedStudent.id);
-    if (updatedSelected) {
-      setSelectedStudent(updatedSelected);
-    }
-  };
 
   // ============================================================
   // FILTER STUDENTS
@@ -936,7 +1007,6 @@ export default function App() {
         onSave={handleSaveStudentAnswers}
         onClose={() => {
           setSelectedStudent(null);
-          // 🔥 Refresh data setelah form ditutup
           refreshDataFromSheets();
         }}
       />
@@ -944,7 +1014,7 @@ export default function App() {
   }
 
   // ============================================================
-  // RENDER JSX
+  // 6. RETURN / RENDER JSX
   // ============================================================
   return (
     <div className="min-h-screen bg-[#FDFCF8] text-[#33332D] font-sans antialiased">
@@ -961,7 +1031,6 @@ export default function App() {
                   MPLS 2026
                 </div>
 
-                {/* 🔥 STATUS SAVE / SYNC */}
                 <div className={`inline-flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 ${
                   saveStatus === 'saving' || isAutoSyncing
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
@@ -1022,10 +1091,9 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 🔥 INDICATOR REFRESH OTOMATIS */}
                 <div className="inline-flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold bg-white/5 border-white/10 text-[#E5E5D8]">
                   <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span>Auto-Refresh 30s</span>
+                  <span>Auto-Refresh 60s</span>
                 </div>
               </div>
               <h1 className="text-2xl md:text-3xl font-serif font-extrabold text-[#FDFCF8] tracking-tight">
@@ -1380,7 +1448,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Sync logs */}
             <div className="lg:col-span-7 bg-[#F5F5F0] border border-[#D6D6C2] rounded-xl p-4 h-44 overflow-y-auto font-mono text-[10px] text-[#5A5A40] space-y-1 scrollbar-thin">
               <div className="flex items-center justify-between border-b border-[#D6D6C2] pb-1.5 mb-2 text-[#8A8A70] font-sans">
                 <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5" /> Konsol Sinkronisasi</span>
@@ -1705,9 +1772,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* ========================================================== */}
-      {/* 🔥 LOGIN MODAL - MODIFIED: HIDE NIS */}
-      {/* ========================================================== */}
+      {/* LOGIN MODAL */}
       {loginStudent && (
         <div className="fixed inset-0 z-50 bg-[#33332D]/60 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-fade-in relative overflow-hidden">
@@ -1722,7 +1787,6 @@ export default function App() {
               <p className="text-xs text-[#8A8A70]">Masukkan NIS Anda untuk verifikasi identitas.</p>
             </div>
 
-            {/* 🔥 MODIFIED: Hanya Nama dan Jurusan, NIS dihilangkan */}
             <div className="bg-[#F5F5F0] rounded-xl p-4 border border-[#E0E0D6] space-y-1">
               <p className="text-[10px] font-bold text-[#8A8A70] uppercase tracking-wide">Biodata</p>
               <p className="text-sm font-extrabold text-[#33332D] leading-snug">{loginStudent.name}</p>
@@ -2047,7 +2111,7 @@ function doPost(e) {
       devSheet.getRange(1, 3).setValue("Keterangan");
       devSheet.getRange(2, 1).setValue("ferrysatriawan49@guru.smk.belajar.id");
       devSheet.getRange(2, 2).setValue("asdf1234");
-      devSheet.getRange(2, 3).setValue("⚠️ Ubah cell A2 dan B2 untuk mengganti akun login developer. Password default TIDAK BERLAKU lagi!");
+      devSheet.getRange(2, 3).setValue("⚠️ Ubah cell A2 dan B2 untuk mengganti akun login developer.");
     }
     
     var storedEmail = String(devSheet.getRange(2, 1).getValue()).trim().toLowerCase();
@@ -2077,7 +2141,7 @@ function doPost(e) {
         .createTextOutput(JSON.stringify({
           status: "success",
           verified: isVerified,
-          message: isVerified ? "✅ Akses developer berhasil diverifikasi." : "❌ Email atau Password developer salah. Password default TIDAK BERLAKU! Gunakan data di sheet 'developer'."
+          message: isVerified ? "✅ Akses developer berhasil diverifikasi." : "❌ Email atau Password developer salah."
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -2088,39 +2152,20 @@ function doPost(e) {
       var newEmailInput = String(payload.newEmail || "").trim().toLowerCase();
       var newPasswordInput = String(payload.newPassword || "").trim();
       
-      Logger.log("📥 Data diterima untuk update:");
-      Logger.log("Current Email: " + currentEmailInput);
-      Logger.log("Current Password: " + currentPasswordInput);
-      Logger.log("Stored Email: " + storedEmail);
-      Logger.log("Stored Password: " + storedPassword);
-      
       var emailMatch = (currentEmailInput === storedEmail);
       var passwordMatch = (currentPasswordInput === storedPassword);
-      Logger.log("Email Match: " + emailMatch);
-      Logger.log("Password Match: " + passwordMatch);
       
       if (!emailMatch || !passwordMatch) {
-        Logger.log("❌ Kredensial tidak cocok!");
         return ContentService
           .createTextOutput(JSON.stringify({
             status: "error",
-            message: "❌ Kredensial lama tidak cocok! Gagal memperbarui.",
-            debug: {
-              emailMatch: emailMatch,
-              passwordMatch: passwordMatch,
-              storedEmail: storedEmail,
-              storedPassword: storedPassword,
-              inputEmail: currentEmailInput,
-              inputPassword: currentPasswordInput
-            }
+            message: "❌ Kredensial lama tidak cocok! Gagal memperbarui."
           }))
           .setMimeType(ContentService.MimeType.JSON);
       }
       
       devSheet.getRange(2, 1).setValue(newEmailInput);
       devSheet.getRange(2, 2).setValue(newPasswordInput);
-      
-      Logger.log("✅ Kredensial berhasil diperbarui!");
       
       return ContentService
         .createTextOutput(JSON.stringify({
@@ -2204,12 +2249,51 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     
+    if (payload.action === "uploadPhoto") {
+      var fileName = payload.fileName || "foto_siswa.jpg";
+      var fileType = payload.fileType || "image/jpeg";
+      var fileData = payload.fileData || "";
+      var studentNis = payload.studentNis || "";
+      var studentName = payload.studentName || "";
+      
+      try {
+        var base64Data = fileData.split(',')[1] || fileData;
+        var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), fileType, fileName);
+        
+        var folderName = "FOTO_SISWA";
+        var folders = DriveApp.getFoldersByName(folderName);
+        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        
+        var file = folder.createFile(blob);
+        var fileId = file.getId();
+        var fileUrl = "https://drive.google.com/uc?export=view&id=" + fileId;
+        
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            status: "success",
+            fileId: fileId,
+            fileUrl: fileUrl,
+            fileName: fileName,
+            message: "Foto berhasil diupload ke Google Drive"
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+          
+      } catch (err) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            status: "error",
+            message: "Gagal upload foto: " + err.toString()
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
     var students = payload.students;
     if (!students || !Array.isArray(students)) {
       return ContentService
         .createTextOutput(JSON.stringify({
           status: "error",
-          message: "Format data salah. Mengharapkan daftar 'students' atau 'action'."
+          message: "Format data salah. Mengharapkan daftar 'students'."
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -2219,7 +2303,7 @@ function doPost(e) {
       var sheets = ss.getSheets();
       for (var i = 0; i < sheets.length; i++) {
         var name = sheets[i].getName().toLowerCase();
-        if (name !== "developer") {
+        if (name !== "developer" && name !== "_version") {
           sheet = sheets[i];
           break;
         }
@@ -2228,6 +2312,7 @@ function doPost(e) {
     if (!sheet) {
       sheet = ss.insertSheet("Data Siswa");
     }
+    
     var lastRow = sheet.getLastRow();
     
     if (lastRow === 0) {
@@ -2235,17 +2320,21 @@ function doPost(e) {
       for (var i = 1; i <= 166; i++) {
         headers.push("Q" + i);
       }
+      headers.push("PHOTO_FILE_ID");
+      headers.push("PHOTO_FILE_URL");
       sheet.appendRow(headers);
       lastRow = 1;
     }
     
-    var nisMap = {};
+    var nisToRowMap = {};
     if (lastRow > 1) {
-      var nisRangeValues = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
-      for (var r = 0; r < nisRangeValues.length; r++) {
-        var existingNis = String(nisRangeValues[r][0]).trim();
+      var nisRange = sheet.getRange(2, 2, lastRow - 1, 1);
+      var nisValues = nisRange.getValues();
+      
+      for (var r = 0; r < nisValues.length; r++) {
+        var existingNis = String(nisValues[r][0]).trim();
         if (existingNis) {
-          nisMap[existingNis] = r + 2;
+          nisToRowMap[existingNis] = r + 2;
         }
       }
     }
@@ -2257,13 +2346,24 @@ function doPost(e) {
       var student = students[s];
       var answers = student.answers || {};
       
+      var targetNis = String(student.nis || "").trim();
+      if (!targetNis) {
+        continue;
+      }
+      
+      if (!answers["q2"] || String(answers["q2"]).trim() !== targetNis) {
+        answers["q2"] = targetNis;
+      }
+      
+      var formattedPercent = (student.progressPercent || 0) + " %";
+      
       var rowData = [
-        student.id,
-        student.nis,
-        student.name,
-        student.progress,
-        student.progressPercent + "%",
-        student.lastUpdated || ""
+        student.id || targetNis,
+        targetNis,
+        student.name || "",
+        student.progress || "not_started",
+        formattedPercent,
+        student.lastUpdated || new Date().toISOString()
       ];
       
       for (var q = 1; q <= 166; q++) {
@@ -2284,14 +2384,21 @@ function doPost(e) {
         rowData.push(String(answerVal));
       }
       
-      var targetNis = String(student.nis).trim();
-      if (nisMap[targetNis]) {
-        var rowNum = nisMap[targetNis];
+      rowData.push(answers.photo_file_id || "");
+      rowData.push(answers.photo_file_url || "");
+      
+      if (nisToRowMap[targetNis]) {
+        var rowNum = nisToRowMap[targetNis];
+        var currentCols = sheet.getLastColumn();
+        
+        while (rowData.length < currentCols) {
+          rowData.push("");
+        }
+        
         sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
         updatedCount++;
       } else {
         sheet.appendRow(rowData);
-        nisMap[targetNis] = sheet.getLastRow();
         insertedCount++;
       }
     }
@@ -2304,14 +2411,16 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
     
   } catch (err) {
+    try {
+      lock.releaseLock();
+    } catch (e) {}
+    
     return ContentService
       .createTextOutput(JSON.stringify({
         status: "error",
         message: "Gagal memproses data: " + err.toString()
       }))
       .setMimeType(ContentService.MimeType.JSON);
-  } finally {
-    lock.releaseLock();
   }
 }`;
                     navigator.clipboard.writeText(codeText);
@@ -2374,7 +2483,7 @@ function doPost(e) {
       devSheet.getRange(1, 3).setValue("Keterangan");
       devSheet.getRange(2, 1).setValue("ferrysatriawan49@guru.smk.belajar.id");
       devSheet.getRange(2, 2).setValue("asdf1234");
-      devSheet.getRange(2, 3).setValue("⚠️ Ubah cell A2 dan B2 untuk mengganti akun login developer. Password default TIDAK BERLAKU lagi!");
+      devSheet.getRange(2, 3).setValue("⚠️ Ubah cell A2 dan B2 untuk mengganti akun login developer.");
     }
     
     var storedEmail = String(devSheet.getRange(2, 1).getValue()).trim().toLowerCase();
@@ -2404,7 +2513,7 @@ function doPost(e) {
         .createTextOutput(JSON.stringify({
           status: "success",
           verified: isVerified,
-          message: isVerified ? "✅ Akses developer berhasil diverifikasi." : "❌ Email atau Password developer salah. Password default TIDAK BERLAKU! Gunakan data di sheet 'developer'."
+          message: isVerified ? "✅ Akses developer berhasil diverifikasi." : "❌ Email atau Password developer salah."
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -2415,39 +2524,20 @@ function doPost(e) {
       var newEmailInput = String(payload.newEmail || "").trim().toLowerCase();
       var newPasswordInput = String(payload.newPassword || "").trim();
       
-      Logger.log("📥 Data diterima untuk update:");
-      Logger.log("Current Email: " + currentEmailInput);
-      Logger.log("Current Password: " + currentPasswordInput);
-      Logger.log("Stored Email: " + storedEmail);
-      Logger.log("Stored Password: " + storedPassword);
-      
       var emailMatch = (currentEmailInput === storedEmail);
       var passwordMatch = (currentPasswordInput === storedPassword);
-      Logger.log("Email Match: " + emailMatch);
-      Logger.log("Password Match: " + passwordMatch);
       
       if (!emailMatch || !passwordMatch) {
-        Logger.log("❌ Kredensial tidak cocok!");
         return ContentService
           .createTextOutput(JSON.stringify({
             status: "error",
-            message: "❌ Kredensial lama tidak cocok! Gagal memperbarui.",
-            debug: {
-              emailMatch: emailMatch,
-              passwordMatch: passwordMatch,
-              storedEmail: storedEmail,
-              storedPassword: storedPassword,
-              inputEmail: currentEmailInput,
-              inputPassword: currentPasswordInput
-            }
+            message: "❌ Kredensial lama tidak cocok! Gagal memperbarui."
           }))
           .setMimeType(ContentService.MimeType.JSON);
       }
       
       devSheet.getRange(2, 1).setValue(newEmailInput);
       devSheet.getRange(2, 2).setValue(newPasswordInput);
-      
-      Logger.log("✅ Kredensial berhasil diperbarui!");
       
       return ContentService
         .createTextOutput(JSON.stringify({
@@ -2531,12 +2621,51 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     
+    if (payload.action === "uploadPhoto") {
+      var fileName = payload.fileName || "foto_siswa.jpg";
+      var fileType = payload.fileType || "image/jpeg";
+      var fileData = payload.fileData || "";
+      var studentNis = payload.studentNis || "";
+      var studentName = payload.studentName || "";
+      
+      try {
+        var base64Data = fileData.split(',')[1] || fileData;
+        var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), fileType, fileName);
+        
+        var folderName = "FOTO_SISWA";
+        var folders = DriveApp.getFoldersByName(folderName);
+        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        
+        var file = folder.createFile(blob);
+        var fileId = file.getId();
+        var fileUrl = "https://drive.google.com/uc?export=view&id=" + fileId;
+        
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            status: "success",
+            fileId: fileId,
+            fileUrl: fileUrl,
+            fileName: fileName,
+            message: "Foto berhasil diupload ke Google Drive"
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+          
+      } catch (err) {
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            status: "error",
+            message: "Gagal upload foto: " + err.toString()
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
     var students = payload.students;
     if (!students || !Array.isArray(students)) {
       return ContentService
         .createTextOutput(JSON.stringify({
           status: "error",
-          message: "Format data salah. Mengharapkan daftar 'students' atau 'action'."
+          message: "Format data salah. Mengharapkan daftar 'students'."
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -2546,7 +2675,7 @@ function doPost(e) {
       var sheets = ss.getSheets();
       for (var i = 0; i < sheets.length; i++) {
         var name = sheets[i].getName().toLowerCase();
-        if (name !== "developer") {
+        if (name !== "developer" && name !== "_version") {
           sheet = sheets[i];
           break;
         }
@@ -2555,6 +2684,7 @@ function doPost(e) {
     if (!sheet) {
       sheet = ss.insertSheet("Data Siswa");
     }
+    
     var lastRow = sheet.getLastRow();
     
     if (lastRow === 0) {
@@ -2562,17 +2692,21 @@ function doPost(e) {
       for (var i = 1; i <= 166; i++) {
         headers.push("Q" + i);
       }
+      headers.push("PHOTO_FILE_ID");
+      headers.push("PHOTO_FILE_URL");
       sheet.appendRow(headers);
       lastRow = 1;
     }
     
-    var nisMap = {};
+    var nisToRowMap = {};
     if (lastRow > 1) {
-      var nisRangeValues = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
-      for (var r = 0; r < nisRangeValues.length; r++) {
-        var existingNis = String(nisRangeValues[r][0]).trim();
+      var nisRange = sheet.getRange(2, 2, lastRow - 1, 1);
+      var nisValues = nisRange.getValues();
+      
+      for (var r = 0; r < nisValues.length; r++) {
+        var existingNis = String(nisValues[r][0]).trim();
         if (existingNis) {
-          nisMap[existingNis] = r + 2;
+          nisToRowMap[existingNis] = r + 2;
         }
       }
     }
@@ -2584,13 +2718,24 @@ function doPost(e) {
       var student = students[s];
       var answers = student.answers || {};
       
+      var targetNis = String(student.nis || "").trim();
+      if (!targetNis) {
+        continue;
+      }
+      
+      if (!answers["q2"] || String(answers["q2"]).trim() !== targetNis) {
+        answers["q2"] = targetNis;
+      }
+      
+      var formattedPercent = (student.progressPercent || 0) + " %";
+      
       var rowData = [
-        student.id,
-        student.nis,
-        student.name,
-        student.progress,
-        student.progressPercent + "%",
-        student.lastUpdated || ""
+        student.id || targetNis,
+        targetNis,
+        student.name || "",
+        student.progress || "not_started",
+        formattedPercent,
+        student.lastUpdated || new Date().toISOString()
       ];
       
       for (var q = 1; q <= 166; q++) {
@@ -2611,14 +2756,21 @@ function doPost(e) {
         rowData.push(String(answerVal));
       }
       
-      var targetNis = String(student.nis).trim();
-      if (nisMap[targetNis]) {
-        var rowNum = nisMap[targetNis];
+      rowData.push(answers.photo_file_id || "");
+      rowData.push(answers.photo_file_url || "");
+      
+      if (nisToRowMap[targetNis]) {
+        var rowNum = nisToRowMap[targetNis];
+        var currentCols = sheet.getLastColumn();
+        
+        while (rowData.length < currentCols) {
+          rowData.push("");
+        }
+        
         sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
         updatedCount++;
       } else {
         sheet.appendRow(rowData);
-        nisMap[targetNis] = sheet.getLastRow();
         insertedCount++;
       }
     }
@@ -2631,14 +2783,16 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
     
   } catch (err) {
+    try {
+      lock.releaseLock();
+    } catch (e) {}
+    
     return ContentService
       .createTextOutput(JSON.stringify({
         status: "error",
         message: "Gagal memproses data: " + err.toString()
       }))
       .setMimeType(ContentService.MimeType.JSON);
-  } finally {
-    lock.releaseLock();
   }
 }`}
               </pre>

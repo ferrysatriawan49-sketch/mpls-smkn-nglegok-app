@@ -7,7 +7,7 @@ export const JURUSAN_OPTIONS = [
   { value: 'TKJ', label: 'TKJ (Teknik Komputer Jaringan)' },
   { value: 'TB', label: 'TB (Tata Boga)' },
   { value: 'BDP', label: 'BDP (Bisnis Daring Pemasaran)' },
-  { value: 'AKL', label: 'AKL (Akutansi)' }
+  { value: 'AKL', label: 'AKL (Akuntansi)' }
 ];
 
 export const AGAMA_OPTIONS = [
@@ -53,7 +53,15 @@ const QUESTIONS_1_TO_70: Question[] = [
   },
   { id: 'q4', number: 4, text: 'Tempat Lahir', type: 'text', required: true, minLength: 2, placeholder: 'Nama Kota/Kabupaten' },
   { id: 'q5', number: 5, text: 'Tanggal Lahir', type: 'date', required: true, validationMessage: 'Format tanggal harus dd-mm-yyyy' },
-  { id: 'q6', number: 6, text: 'Foto Selfie (100 kb - 500 kb)', type: 'file', required: true },
+  // 🔥 Q6: Foto Selfie - DIPERBAIKI
+  { 
+    id: 'q6', 
+    number: 6, 
+    text: 'Foto Selfie (upload foto dengan batas 100 kb - 500 kb)', 
+    type: 'file', 
+    required: true,
+    validationMessage: 'Ukuran file harus antara 100 KB - 500 KB'
+  },
   { id: 'q7', number: 7, text: 'Agama', type: 'select', required: true, options: AGAMA_OPTIONS },
   { 
     id: 'q8', 
@@ -65,7 +73,15 @@ const QUESTIONS_1_TO_70: Question[] = [
     maxLength: 100,
     placeholder: 'Tulis alamat lengkap minimal 35 karakter dan maksimal 100 karakter'
   },
-  { id: 'q9', number: 9, text: 'Foto Rumah (Tampak Depan) (100 kb - 500 kb)', type: 'file', required: true },
+  // 🔥 Q9: Foto Rumah - DIPERBAIKI
+  { 
+    id: 'q9', 
+    number: 9, 
+    text: 'Foto Rumah (upload foto dengan batas 100 kb - 500 kb)', 
+    type: 'file', 
+    required: true,
+    validationMessage: 'Ukuran file harus antara 100 KB - 500 KB'
+  },
   { 
     id: 'q10', 
     number: 10, 
@@ -188,7 +204,15 @@ const QUESTIONS_1_TO_70: Question[] = [
       { value: 'Ayah / Ibu Tidak Tinggal Bersama Karena Salah Satu / Keduanya Sudah Meninggal', label: 'Ayah / Ibu Tidak Tinggal Bersama Karena Salah Satu / Keduanya Sudah Meninggal' }
     ]
   },
-  { id: 'q29', number: 29, text: 'Foto Bersama Keluarga (100 kb - 500 kb)', type: 'file', required: true },
+  // 🔥 Q29: Foto Bersama Keluarga - DIPERBAIKI
+  { 
+    id: 'q29', 
+    number: 29, 
+    text: 'Foto Bersama Keluarga (upload foto dengan batas 100 kb - 500 kb)', 
+    type: 'file', 
+    required: true,
+    validationMessage: 'Ukuran file harus antara 100 KB - 500 KB'
+  },
   { 
     id: 'q30', 
     number: 30, 
@@ -615,7 +639,12 @@ const FAMILY_AND_SCHOOL_LIFE_QUESTIONS: { id: string; text: string; num: number 
   { id: 'q95', num: 95, text: 'Orang tua saya peduli dengan perkembangan belajar saya' },
   { id: 'q96', num: 96, text: 'Saya selalu berkomunikasi akrab dengan orang tua' },
   { id: 'q97', num: 97, text: 'Saya bisa menjadi pribadi yang mandiri' },
-  { id: 'q98', num: 98, text: 'Saya sedang memiliki konflik pribadi' },
+  // 🔥 Q98: Konflik Pribadi - DIPERBAIKI
+  { 
+    id: 'q98', 
+    num: 98, 
+    text: 'Saya sedang memiliki konflik pribadi (max 50 karakter)'
+  },
   { id: 'q99', num: 99, text: 'Saya memahami tentang norma/cara membangun berkeluarga' },
   { id: 'q100', num: 100, text: 'Saya banyak mengenal lingkungan sekolah baru' },
   { id: 'q101', num: 101, text: 'Saya memahami tentang kenakalan remaja' },
