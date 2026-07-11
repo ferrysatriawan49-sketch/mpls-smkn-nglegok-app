@@ -25,6 +25,7 @@ export default function App() {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // 🔥 UNTUK LOADING SCREEN
   
   // Login Gate State
   const [loginStudent, setLoginStudent] = useState<Student | null>(null);
@@ -32,23 +33,24 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Sheets Syncing State
-  // const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
-  //   return localStorage.getItem('mpls_google_sheets_url') || 'https://script.google.com/macros/s/AKfycbwn52uWUiLwjVa4CUBHN10CGS-NGXv1YP3Z5k8eksY67y-wSBT8XQWdP3kHuY-QNpPrhQ/exec';
-  // });
-const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
-  // Prioritaskan dari Environment Variables (Vercel)
-  const envUrl = process.env.REACT_APP_GOOGLE_SHEETS_URL;
-  if (envUrl && envUrl.startsWith('http')) {
-    return envUrl;
-  }
-  // Jika tidak ada, cek localStorage
-  const localUrl = localStorage.getItem('mpls_google_sheets_url');
-  if (localUrl && localUrl.startsWith('http')) {
-    return localUrl;
-  }
-  // Fallback ke URL default (GANTI DENGAN URL BARU ANDA)
-  return 'https://script.google.com/macros/s/AKfycbx4t_4Py7SA8xNtfNgPng9l4H04IEg2m_CYHRPCHFSXrLnZrS8BO4fl-M9FX3qBHiPPcQ/exec';
-});
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
+    // 🔥 Prioritaskan Environment Variables (Vercel)
+    const envUrl = process.env.REACT_APP_GOOGLE_SHEETS_URL;
+    if (envUrl && envUrl.startsWith('http')) {
+      console.log('✅ Menggunakan URL dari Environment Variables:', envUrl);
+      return envUrl;
+    }
+    // Fallback ke localStorage
+    const localUrl = localStorage.getItem('mpls_google_sheets_url');
+    if (localUrl && localUrl.startsWith('http')) {
+      console.log('✅ Menggunakan URL dari localStorage:', localUrl);
+      return localUrl;
+    }
+    // Default terakhir
+    const defaultUrl = 'https://script.google.com/macros/s/AKfycbx4t_4Py7SA8xNtfNgPng9l4H04IEg2m_CYHRPCHFSXrLnZrS8BO4fl-M9FX3qBHiPPcQ/exec';
+    console.log('⚠️ Menggunakan URL default:', defaultUrl);
+    return defaultUrl;
+  });
   const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState(googleSheetsUrl);
   const [urlSavedSuccess, setUrlSavedSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -124,14 +126,90 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
     if (saved) {
       try {
         setStudents(JSON.parse(saved));
+        console.log('✅ Data siswa dimuat dari localStorage');
       } catch (e) {
         setStudents(INITIAL_STUDENTS);
+        console.log('⚠️ Gagal parse localStorage, gunakan data default');
       }
     } else {
       setStudents(INITIAL_STUDENTS);
       localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(INITIAL_STUDENTS));
+      console.log('📝 Data default disimpan ke localStorage');
     }
   }, []);
+
+  // ============================================================
+  // 🔥 AUTO-FETCH DATA DARI GOOGLE SHEETS (BARU)
+  // ============================================================
+  useEffect(() => {
+    const hasLoaded = localStorage.getItem('mpls_initial_load_done');
+    
+    // Jika sudah pernah load, skip auto-fetch
+    if (hasLoaded === 'true') {
+      console.log('ℹ️ Data sudah pernah dimuat, skip auto-fetch');
+      setIsLoading(false);
+      return;
+    }
+
+    // Jika belum pernah load, lakukan auto-fetch
+    const autoFetchData = async () => {
+      console.log('🔄 Auto-fetch data dari Google Sheets...');
+      setIsLoading(true);
+      
+      try {
+        const url = googleSheetsUrl;
+        if (!url || !url.startsWith('http')) {
+          console.warn('⚠️ URL Google Sheets belum diset, skip auto-fetch');
+          setIsLoading(false);
+          return;
+        }
+
+        let response;
+        try {
+          // Coba dengan POST
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: 'fetchStudents' })
+          });
+        } catch (postErr) {
+          console.warn('⚠️ POST gagal, mencoba GET...');
+          const getUrl = url.includes('?') 
+            ? `${url}&action=fetchStudents` 
+            : `${url}?action=fetchStudents`;
+          response = await fetch(getUrl, { method: 'GET' });
+        }
+
+        if (!response || !response.ok) {
+          throw new Error(`HTTP Error: ${response?.status || 'Unknown'}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.status === 'success' && result.students && result.students.length > 0) {
+          // Simpan data ke state dan localStorage
+          setStudents(result.students);
+          localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
+          localStorage.setItem('mpls_initial_load_done', 'true');
+          console.log(`✅ Auto-fetch berhasil: ${result.students.length} data siswa dimuat dari Google Sheets`);
+        } else {
+          console.log('ℹ️ Tidak ada data di Google Sheets, gunakan data default');
+          // Tetap tandai sudah load agar tidak fetch ulang
+          localStorage.setItem('mpls_initial_load_done', 'true');
+        }
+      } catch (err) {
+        console.error('❌ Auto-fetch gagal:', err);
+        // Tetap tandai sudah load agar tidak fetch ulang terus
+        localStorage.setItem('mpls_initial_load_done', 'true');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    autoFetchData();
+  }, [googleSheetsUrl]);
 
   // ============================================================
   // 4. SEMUA FUNGSI LAINNYA
@@ -155,7 +233,7 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
   };
 
   // ============================================================
-  // 🔥 HANDLE DEVELOPER LOGIN - TANPA FALLBACK DEFAULT
+  // HANDLE DEVELOPER LOGIN - TANPA FALLBACK DEFAULT
   // ============================================================
   const handleDevUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,11 +254,20 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
       try {
         let response;
         try {
+          // Coba dengan GET dulu
           const getUrl = `${googleSheetsUrl}${googleSheetsUrl.includes('?') ? '&' : '?'}action=verifyDeveloper&email=${encodeURIComponent(cleanEmail)}&password=${encodeURIComponent(cleanPassword)}`;
-          response = await fetch(getUrl, { method: 'GET' });
+          response = await fetch(getUrl, { 
+            method: 'GET',
+            mode: 'cors',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
         } catch (getErr) {
+          console.warn('GET gagal, mencoba POST...');
           response = await fetch(googleSheetsUrl, {
             method: 'POST',
+            mode: 'cors',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
             },
@@ -203,7 +290,6 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
             alert('✅ Akses developer berhasil dikonfirmasi!');
             return;
           } else {
-            // ❌ TIDAK ADA FALLBACK DEFAULT - HANYA DARI SHEETS
             setDevPasswordError('❌ Email atau Password salah! Password default (admin123) SUDAH TIDAK BERLAKU. Gunakan data di sheet "developer" Google Sheets Anda.');
             setIsVerifyingDev(false);
             return;
@@ -218,7 +304,6 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
         return;
       }
     } else {
-      // ❌ TIDAK ADA FALLBACK OFFLINE
       setDevPasswordError('❌ URL Google Sheets belum diset! Masukkan URL Web App Anda terlebih dahulu.');
       setIsVerifyingDev(false);
       return;
@@ -342,10 +427,6 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
           setDevCurrentPassword('');
           setDevNewEmail('');
           setDevNewPassword('');
-          
-          // Update stored credentials di localStorage
-          localStorage.setItem('mpls_dev_email', newEmailClean);
-          localStorage.setItem('mpls_dev_password', newPasswordClean);
           
           if (result.debug) {
             console.log('🔍 Debug info:', result.debug);
@@ -542,6 +623,7 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
         
         if (importedCount > 0) {
           saveStudentsToDB(result.students);
+          localStorage.setItem('mpls_initial_load_done', 'true'); // 🔥 TANDAI SUDAH LOAD
           resetAllFilters();
           log('✓ Database lokal telah disinkronkan dengan data Google Sheets terbaru!');
           log('✓ Filter otomatis di-reset ke default.');
@@ -696,6 +778,21 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
     currentPage * pageSize
   );
 
+  // ============================================================
+  // 5. LOADING SCREEN
+  // ============================================================
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#FDFCF8] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5A5A40] mx-auto"></div>
+          <p className="text-sm text-[#8A8A70]">Memuat data dari Google Sheets...</p>
+          <p className="text-xs text-[#8A8A70]">Mohon tunggu sebentar</p>
+        </div>
+      </div>
+    );
+  }
+
   // If student is logged in
   if (selectedStudent) {
     return (
@@ -708,7 +805,7 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
   }
 
   // ============================================================
-  // 5. RETURN / RENDER JSX
+  // 6. RETURN / RENDER JSX
   // ============================================================
   return (
     <div className="min-h-screen bg-[#FDFCF8] text-[#33332D] font-sans antialiased">
@@ -1558,9 +1655,7 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
         </div>
       )}
 
-      {/* ========================================================== */}
-      {/* DEVELOPER MODAL - DENGAN PERINGATAN PASSWORD DEFAULT */}
-      {/* ========================================================== */}
+      {/* DEVELOPER MODAL */}
       {showDevPrompt && (
         <div className="fixed inset-0 z-50 bg-[#33332D]/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
@@ -1717,6 +1812,20 @@ const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
     return doPost(postData);
   }
   
+  if (e && e.parameter && e.parameter.action === "verifyDeveloper") {
+    var fakePayload = {
+      action: "verifyDeveloper",
+      email: e.parameter.email || "",
+      password: e.parameter.password || ""
+    };
+    var postData = {
+      postData: {
+        contents: JSON.stringify(fakePayload)
+      }
+    };
+    return doPost(postData);
+  }
+  
   return ContentService
     .createTextOutput(JSON.stringify({
       status: "success",
@@ -1740,8 +1849,8 @@ function doPost(e) {
       devSheet.getRange(1, 1).setValue("Email");
       devSheet.getRange(1, 2).setValue("Password");
       devSheet.getRange(1, 3).setValue("Keterangan");
-      devSheet.getRange(2, 1).setValue("admin@smk.id");
-      devSheet.getRange(2, 2).setValue("admin123");
+      devSheet.getRange(2, 1).setValue("ferrysatriawan49@guru.smk.belajar.id");
+      devSheet.getRange(2, 2).setValue("asdf1234");
       devSheet.getRange(2, 3).setValue("⚠️ Ubah cell A2 dan B2 untuk mengganti akun login developer. Password default TIDAK BERLAKU lagi!");
     }
     
@@ -1749,10 +1858,10 @@ function doPost(e) {
     var storedPassword = String(devSheet.getRange(2, 2).getValue()).trim();
     
     if (!storedEmail || storedEmail === "undefined" || storedEmail === "") {
-      storedEmail = "admin@smk.id";
+      storedEmail = "ferrysatriawan49@guru.smk.belajar.id";
     }
     if (!storedPassword || storedPassword === "undefined" || storedPassword === "") {
-      storedPassword = "admin123";
+      storedPassword = "asdf1234";
     }
     
     if (payload.action === "verifyDeveloper") {
@@ -1772,7 +1881,7 @@ function doPost(e) {
         .createTextOutput(JSON.stringify({
           status: "success",
           verified: isVerified,
-          message: isVerified ? "Akses developer berhasil diverifikasi." : "Email atau Password developer salah. Password default TIDAK BERLAKU!"
+          message: isVerified ? "✅ Akses developer berhasil diverifikasi." : "❌ Email atau Password developer salah. Password default TIDAK BERLAKU! Gunakan data di sheet 'developer'."
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -1799,7 +1908,7 @@ function doPost(e) {
         return ContentService
           .createTextOutput(JSON.stringify({
             status: "error",
-            message: "Kredensial lama tidak cocok! Gagal memperbarui.",
+            message: "❌ Kredensial lama tidak cocok! Gagal memperbarui.",
             debug: {
               emailMatch: emailMatch,
               passwordMatch: passwordMatch,
@@ -1820,13 +1929,83 @@ function doPost(e) {
       return ContentService
         .createTextOutput(JSON.stringify({
           status: "success",
-          message: "Kredensial developer berhasil diperbarui!"
+          message: "✅ Kredensial developer berhasil diperbarui!"
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
     if (payload.action === "fetchStudents") {
-      // ... kode fetchStudents sama seperti sebelumnya ...
+      var sheet = ss.getSheetByName("Data Siswa") || ss.getSheetByName("data siswa") || ss.getSheetByName("DATA SISWA");
+      if (!sheet) {
+        var sheets = ss.getSheets();
+        for (var i = 0; i < sheets.length; i++) {
+          var name = sheets[i].getName().toLowerCase();
+          if (name !== "developer") {
+            sheet = sheets[i];
+            break;
+          }
+        }
+      }
+      
+      var fetchedStudents = [];
+      if (sheet) {
+        var lastRow = sheet.getLastRow();
+        var lastCol = sheet.getLastColumn();
+        if (lastRow > 1 && lastCol > 0) {
+          var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+          var values = dataRange.getValues();
+          
+          for (var r = 0; r < values.length; r++) {
+            var row = values[r];
+            var id = row[0] ? String(row[0]).trim() : "";
+            var nis = row[1] ? String(row[1]).trim() : "";
+            var name = row[2] ? String(row[2]).trim() : "";
+            
+            if (!nis || !name) continue;
+            
+            var progress = row[3] ? String(row[3]).trim() : "not_started";
+            if (progress !== "completed" && progress !== "in_progress") {
+              progress = "not_started";
+            }
+            
+            var percentStr = row[4] ? String(row[4]).replace("%", "").trim() : "0";
+            var progressPercent = parseInt(percentStr) || 0;
+            var lastUpdated = row[5] ? String(row[5]).trim() : "";
+            
+            var answers = {};
+            for (var colIdx = 6; colIdx < lastCol; colIdx++) {
+              var qNum = colIdx - 5;
+              if (qNum <= 166) {
+                var val = row[colIdx];
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                  answers["q" + qNum] = String(val);
+                }
+              }
+            }
+            
+            if (!answers["q1"]) answers["q1"] = name;
+            if (!answers["q2"]) answers["q2"] = nis;
+            
+            fetchedStudents.push({
+              id: id || nis,
+              nis: nis,
+              name: name,
+              progress: progress,
+              progressPercent: progressPercent,
+              answers: answers,
+              lastUpdated: lastUpdated || new Date().toISOString()
+            });
+          }
+        }
+      }
+      
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          status: "success",
+          students: fetchedStudents,
+          message: "Berhasil mengambil " + fetchedStudents.length + " data siswa dari Google Sheets."
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
     
     var students = payload.students;
@@ -1839,7 +2018,94 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     
-    // ... kode sync students sama seperti sebelumnya ...
+    var sheet = ss.getSheetByName("Data Siswa") || ss.getSheetByName("data siswa") || ss.getSheetByName("DATA SISWA");
+    if (!sheet) {
+      var sheets = ss.getSheets();
+      for (var i = 0; i < sheets.length; i++) {
+        var name = sheets[i].getName().toLowerCase();
+        if (name !== "developer") {
+          sheet = sheets[i];
+          break;
+        }
+      }
+    }
+    if (!sheet) {
+      sheet = ss.insertSheet("Data Siswa");
+    }
+    var lastRow = sheet.getLastRow();
+    
+    if (lastRow === 0) {
+      var headers = ["ID", "NIS", "Nama Lengkap", "Status Progress", "Persentase Selesai (%)", "Terakhir Diperbarui"];
+      for (var i = 1; i <= 166; i++) {
+        headers.push("Q" + i);
+      }
+      sheet.appendRow(headers);
+      lastRow = 1;
+    }
+    
+    var nisMap = {};
+    if (lastRow > 1) {
+      var nisRangeValues = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+      for (var r = 0; r < nisRangeValues.length; r++) {
+        var existingNis = String(nisRangeValues[r][0]).trim();
+        if (existingNis) {
+          nisMap[existingNis] = r + 2;
+        }
+      }
+    }
+    
+    var updatedCount = 0;
+    var insertedCount = 0;
+    
+    for (var s = 0; s < students.length; s++) {
+      var student = students[s];
+      var answers = student.answers || {};
+      
+      var rowData = [
+        student.id,
+        student.nis,
+        student.name,
+        student.progress,
+        student.progressPercent + "%",
+        student.lastUpdated || ""
+      ];
+      
+      for (var q = 1; q <= 166; q++) {
+        var key = "q" + q;
+        var answerVal = answers[key];
+        
+        if (Array.isArray(answerVal)) {
+          answerVal = answerVal.join(", ");
+        } else if (answerVal === undefined || answerVal === null) {
+          answerVal = "";
+        }
+        
+        var otherKey = key + "_other";
+        if (answers[otherKey]) {
+          answerVal += " (Lainnya: " + answers[otherKey] + ")";
+        }
+        
+        rowData.push(String(answerVal));
+      }
+      
+      var targetNis = String(student.nis).trim();
+      if (nisMap[targetNis]) {
+        var rowNum = nisMap[targetNis];
+        sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+        updatedCount++;
+      } else {
+        sheet.appendRow(rowData);
+        nisMap[targetNis] = sheet.getLastRow();
+        insertedCount++;
+      }
+    }
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Sinkronisasi berhasil! " + insertedCount + " baris ditambahkan, " + updatedCount + " baris diperbarui."
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
     
   } catch (err) {
     return ContentService
@@ -1873,6 +2139,20 @@ function doPost(e) {
     return doPost(postData);
   }
   
+  if (e && e.parameter && e.parameter.action === "verifyDeveloper") {
+    var fakePayload = {
+      action: "verifyDeveloper",
+      email: e.parameter.email || "",
+      password: e.parameter.password || ""
+    };
+    var postData = {
+      postData: {
+        contents: JSON.stringify(fakePayload)
+      }
+    };
+    return doPost(postData);
+  }
+  
   return ContentService
     .createTextOutput(JSON.stringify({
       status: "success",
@@ -1896,8 +2176,8 @@ function doPost(e) {
       devSheet.getRange(1, 1).setValue("Email");
       devSheet.getRange(1, 2).setValue("Password");
       devSheet.getRange(1, 3).setValue("Keterangan");
-      devSheet.getRange(2, 1).setValue("admin@smk.id");
-      devSheet.getRange(2, 2).setValue("admin123");
+      devSheet.getRange(2, 1).setValue("ferrysatriawan49@guru.smk.belajar.id");
+      devSheet.getRange(2, 2).setValue("asdf1234");
       devSheet.getRange(2, 3).setValue("⚠️ Ubah cell A2 dan B2 untuk mengganti akun login developer. Password default TIDAK BERLAKU lagi!");
     }
     
@@ -1905,10 +2185,10 @@ function doPost(e) {
     var storedPassword = String(devSheet.getRange(2, 2).getValue()).trim();
     
     if (!storedEmail || storedEmail === "undefined" || storedEmail === "") {
-      storedEmail = "admin@smk.id";
+      storedEmail = "ferrysatriawan49@guru.smk.belajar.id";
     }
     if (!storedPassword || storedPassword === "undefined" || storedPassword === "") {
-      storedPassword = "admin123";
+      storedPassword = "asdf1234";
     }
     
     if (payload.action === "verifyDeveloper") {
@@ -1928,7 +2208,7 @@ function doPost(e) {
         .createTextOutput(JSON.stringify({
           status: "success",
           verified: isVerified,
-          message: isVerified ? "Akses developer berhasil diverifikasi." : "Email atau Password developer salah. Password default TIDAK BERLAKU!"
+          message: isVerified ? "✅ Akses developer berhasil diverifikasi." : "❌ Email atau Password developer salah. Password default TIDAK BERLAKU! Gunakan data di sheet 'developer'."
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -1955,7 +2235,7 @@ function doPost(e) {
         return ContentService
           .createTextOutput(JSON.stringify({
             status: "error",
-            message: "Kredensial lama tidak cocok! Gagal memperbarui.",
+            message: "❌ Kredensial lama tidak cocok! Gagal memperbarui.",
             debug: {
               emailMatch: emailMatch,
               passwordMatch: passwordMatch,
@@ -1976,12 +2256,183 @@ function doPost(e) {
       return ContentService
         .createTextOutput(JSON.stringify({
           status: "success",
-          message: "Kredensial developer berhasil diperbarui!"
+          message: "✅ Kredensial developer berhasil diperbarui!"
         }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
-    // ... kode fetchStudents dan sync students sama seperti sebelumnya ...
+    if (payload.action === "fetchStudents") {
+      var sheet = ss.getSheetByName("Data Siswa") || ss.getSheetByName("data siswa") || ss.getSheetByName("DATA SISWA");
+      if (!sheet) {
+        var sheets = ss.getSheets();
+        for (var i = 0; i < sheets.length; i++) {
+          var name = sheets[i].getName().toLowerCase();
+          if (name !== "developer") {
+            sheet = sheets[i];
+            break;
+          }
+        }
+      }
+      
+      var fetchedStudents = [];
+      if (sheet) {
+        var lastRow = sheet.getLastRow();
+        var lastCol = sheet.getLastColumn();
+        if (lastRow > 1 && lastCol > 0) {
+          var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+          var values = dataRange.getValues();
+          
+          for (var r = 0; r < values.length; r++) {
+            var row = values[r];
+            var id = row[0] ? String(row[0]).trim() : "";
+            var nis = row[1] ? String(row[1]).trim() : "";
+            var name = row[2] ? String(row[2]).trim() : "";
+            
+            if (!nis || !name) continue;
+            
+            var progress = row[3] ? String(row[3]).trim() : "not_started";
+            if (progress !== "completed" && progress !== "in_progress") {
+              progress = "not_started";
+            }
+            
+            var percentStr = row[4] ? String(row[4]).replace("%", "").trim() : "0";
+            var progressPercent = parseInt(percentStr) || 0;
+            var lastUpdated = row[5] ? String(row[5]).trim() : "";
+            
+            var answers = {};
+            for (var colIdx = 6; colIdx < lastCol; colIdx++) {
+              var qNum = colIdx - 5;
+              if (qNum <= 166) {
+                var val = row[colIdx];
+                if (val !== undefined && val !== null && String(val).trim() !== "") {
+                  answers["q" + qNum] = String(val);
+                }
+              }
+            }
+            
+            if (!answers["q1"]) answers["q1"] = name;
+            if (!answers["q2"]) answers["q2"] = nis;
+            
+            fetchedStudents.push({
+              id: id || nis,
+              nis: nis,
+              name: name,
+              progress: progress,
+              progressPercent: progressPercent,
+              answers: answers,
+              lastUpdated: lastUpdated || new Date().toISOString()
+            });
+          }
+        }
+      }
+      
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          status: "success",
+          students: fetchedStudents,
+          message: "Berhasil mengambil " + fetchedStudents.length + " data siswa dari Google Sheets."
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var students = payload.students;
+    if (!students || !Array.isArray(students)) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          status: "error",
+          message: "Format data salah. Mengharapkan daftar 'students' atau 'action'."
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var sheet = ss.getSheetByName("Data Siswa") || ss.getSheetByName("data siswa") || ss.getSheetByName("DATA SISWA");
+    if (!sheet) {
+      var sheets = ss.getSheets();
+      for (var i = 0; i < sheets.length; i++) {
+        var name = sheets[i].getName().toLowerCase();
+        if (name !== "developer") {
+          sheet = sheets[i];
+          break;
+        }
+      }
+    }
+    if (!sheet) {
+      sheet = ss.insertSheet("Data Siswa");
+    }
+    var lastRow = sheet.getLastRow();
+    
+    if (lastRow === 0) {
+      var headers = ["ID", "NIS", "Nama Lengkap", "Status Progress", "Persentase Selesai (%)", "Terakhir Diperbarui"];
+      for (var i = 1; i <= 166; i++) {
+        headers.push("Q" + i);
+      }
+      sheet.appendRow(headers);
+      lastRow = 1;
+    }
+    
+    var nisMap = {};
+    if (lastRow > 1) {
+      var nisRangeValues = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+      for (var r = 0; r < nisRangeValues.length; r++) {
+        var existingNis = String(nisRangeValues[r][0]).trim();
+        if (existingNis) {
+          nisMap[existingNis] = r + 2;
+        }
+      }
+    }
+    
+    var updatedCount = 0;
+    var insertedCount = 0;
+    
+    for (var s = 0; s < students.length; s++) {
+      var student = students[s];
+      var answers = student.answers || {};
+      
+      var rowData = [
+        student.id,
+        student.nis,
+        student.name,
+        student.progress,
+        student.progressPercent + "%",
+        student.lastUpdated || ""
+      ];
+      
+      for (var q = 1; q <= 166; q++) {
+        var key = "q" + q;
+        var answerVal = answers[key];
+        
+        if (Array.isArray(answerVal)) {
+          answerVal = answerVal.join(", ");
+        } else if (answerVal === undefined || answerVal === null) {
+          answerVal = "";
+        }
+        
+        var otherKey = key + "_other";
+        if (answers[otherKey]) {
+          answerVal += " (Lainnya: " + answers[otherKey] + ")";
+        }
+        
+        rowData.push(String(answerVal));
+      }
+      
+      var targetNis = String(student.nis).trim();
+      if (nisMap[targetNis]) {
+        var rowNum = nisMap[targetNis];
+        sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+        updatedCount++;
+      } else {
+        sheet.appendRow(rowData);
+        nisMap[targetNis] = sheet.getLastRow();
+        insertedCount++;
+      }
+    }
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Sinkronisasi berhasil! " + insertedCount + " baris ditambahkan, " + updatedCount + " baris diperbarui."
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
     
   } catch (err) {
     return ContentService
