@@ -5,9 +5,273 @@ import { calculateProgressPercent, formatGPS } from '../utils';
 import { 
   User, Users, Heart, Award, GraduationCap, Briefcase, 
   ArrowLeft, ArrowRight, Save, CheckCircle2, AlertCircle, 
-  MapPin, UploadCloud, Eye, RefreshCw, LogOut, CheckSquare, Square
+  MapPin, UploadCloud, Eye, RefreshCw, LogOut, CheckSquare, Square,
+  Camera, Upload, X, Loader2
 } from 'lucide-react';
 
+// ============================================================
+// 🔥 KOMPONEN PHOTO UPLOAD (INTEGRASI DI DALAM FILE INI)
+// ============================================================
+interface PhotoUploadProps {
+  studentNis: string;
+  studentName: string;
+  onPhotoUploaded: (fileId: string, fileUrl: string) => void;
+  onPhotoError: (error: string) => void;
+  existingPhotoUrl?: string | null;
+}
+
+function PhotoUpload({ studentNis, studentName, onPhotoUploaded, onPhotoError, existingPhotoUrl }: PhotoUploadProps) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(existingPhotoUrl || null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 🔥 Format nama file: NIS-Nama-FOTO
+  const generateFileName = (nis: string, name: string) => {
+    const cleanName = name.replace(/\s+/g, '_').toUpperCase();
+    const timestamp = new Date().getTime();
+    return `${nis}-${cleanName}-FOTO_${timestamp}`;
+  };
+
+  // 🔥 Konversi File ke Base64 untuk preview
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // 🔥 Upload ke Google Drive via Apps Script
+  const uploadToDrive = async (file: File, fileName: string) => {
+    const base64Data = await fileToBase64(file);
+    const payload = {
+      action: 'uploadPhoto',
+      fileName: fileName,
+      fileType: file.type,
+      fileData: base64Data,
+      studentNis: studentNis,
+      studentName: studentName
+    };
+
+    const url = localStorage.getItem('mpls_google_sheets_url') || '';
+    if (!url) {
+      throw new Error('URL Google Sheets belum diset');
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result;
+  };
+
+  // 🔥 Handle File Selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi file
+    if (!file.type.startsWith('image/')) {
+      onPhotoError('File harus berupa gambar!');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      onPhotoError('Ukuran file maksimal 5MB!');
+      return;
+    }
+
+    setPhotoFile(file);
+    setUploadStatus('idle');
+
+    // Preview
+    try {
+      const preview = await fileToBase64(file);
+      setPhotoPreview(preview);
+    } catch (err) {
+      console.error('Gagal membuat preview:', err);
+    }
+  };
+
+  // 🔥 Handle Upload
+  const handleUpload = async () => {
+    if (!photoFile) {
+      onPhotoError('Pilih gambar terlebih dahulu!');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus('uploading');
+    setUploadProgress(0);
+
+    try {
+      // Simulasi progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
+
+      const fileName = generateFileName(studentNis, studentName);
+      const result = await uploadToDrive(photoFile, fileName);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (result.status === 'success') {
+        setUploadStatus('success');
+        onPhotoUploaded(result.fileId || 'local', result.fileUrl || photoPreview || '');
+        alert('✅ Foto berhasil diupload!');
+      } else {
+        throw new Error(result.message || 'Upload gagal');
+      }
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      setUploadStatus('error');
+      onPhotoError(err.message || 'Gagal upload foto');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // 🔥 Remove Photo
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setUploadStatus('idle');
+    setUploadProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Drop Zone */}
+      <div 
+        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
+          photoPreview 
+            ? 'border-emerald-300 bg-emerald-50/50' 
+            : 'border-[#D6D6C2] hover:border-[#8A8A70] hover:bg-[#F5F5F0]'
+        }`}
+        onClick={() => !photoPreview && !isUploading && fileInputRef.current?.click()}
+      >
+        {photoPreview ? (
+          <div className="relative">
+            <img 
+              src={photoPreview} 
+              alt="Preview Foto" 
+              className="max-h-48 mx-auto rounded-lg object-contain"
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isUploading) handleRemovePhoto();
+              }}
+              disabled={isUploading}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-md disabled:opacity-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Camera className="w-10 h-10 text-[#8A8A70] mx-auto" />
+            <p className="text-sm font-medium text-[#33332D]">Klik untuk upload foto</p>
+            <p className="text-xs text-[#8A8A70]">Format: JPG, PNG, GIF (Maks. 5MB)</p>
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+          disabled={isUploading}
+        />
+      </div>
+
+      {/* Upload Button & Status */}
+      {photoFile && uploadStatus !== 'success' && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleUpload}
+            disabled={isUploading}
+            className="w-full bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Uploading... {uploadProgress}%
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Upload ke Google Drive
+              </>
+            )}
+          </button>
+          
+          {isUploading && (
+            <div className="w-full bg-[#E5E5D8] rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-[#5A5A40] h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Status */}
+      {uploadStatus === 'success' && (
+        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-2 rounded-lg text-sm">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Foto berhasil diupload</span>
+        </div>
+      )}
+
+      {uploadStatus === 'error' && (
+        <div className="flex items-center gap-2 text-red-600 bg-red-50 p-2 rounded-lg text-sm">
+          <AlertCircle className="w-4 h-4" />
+          <span>Gagal upload foto. Silakan coba lagi.</span>
+        </div>
+      )}
+
+      {/* Info Nama File */}
+      {photoFile && uploadStatus !== 'success' && (
+        <div className="text-xs text-[#8A8A70] bg-[#F5F5F0] p-2 rounded-lg">
+          <span className="font-semibold">File:</span> {photoFile.name}
+          <br />
+          <span className="font-semibold">Akan disimpan sebagai:</span> {generateFileName(studentNis, studentName)}.{photoFile.name.split('.').pop()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN STUDENTFORM COMPONENT
+// ============================================================
 interface StudentFormProps {
   student: Student;
   onSave: (answers: Record<string, any>, isSubmitted: boolean) => void;
@@ -22,6 +286,11 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showAllErrors, setShowAllErrors] = useState(false);
 
+  // 🔥 State untuk foto
+  const [photoFileId, setPhotoFileId] = useState<string | null>(null);
+  const [photoFileUrl, setPhotoFileUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   // Auto-set the Read-Only questions on mount
   useEffect(() => {
     setAnswers(prev => ({
@@ -29,12 +298,37 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
       q1: student.name,
       q2: student.nis
     }));
+    
+    // Cek apakah ada foto yang sudah tersimpan
+    if (student.answers.photo_file_id) {
+      setPhotoFileId(student.answers.photo_file_id);
+      setPhotoFileUrl(student.answers.photo_file_url || null);
+    }
   }, [student]);
 
   const questions = getQuestionsList();
 
   // Progress of current answers
   const currentProgressPercent = calculateProgressPercent(answers, questions);
+
+  // 🔥 Handler untuk photo upload
+  const handlePhotoUploaded = (fileId: string, fileUrl: string) => {
+    setPhotoFileId(fileId);
+    setPhotoFileUrl(fileUrl);
+    // Simpan ke answers
+    const updatedAnswers = { 
+      ...answers, 
+      photo_file_id: fileId, 
+      photo_file_url: fileUrl 
+    };
+    setAnswers(updatedAnswers);
+  };
+
+  // 🔥 Handler untuk photo error
+  const handlePhotoError = (error: string) => {
+    setPhotoError(error);
+    setTimeout(() => setPhotoError(null), 5000);
+  };
 
   // Validate a single field
   const validateField = (q: Question, value: any): string => {
@@ -212,7 +506,13 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
 
   // Save progress draft
   const handleSaveDraft = () => {
-    onSave(answers, false);
+    // 🔥 Sertakan data foto dalam answers
+    const fullAnswers = {
+      ...answers,
+      photo_file_id: photoFileId,
+      photo_file_url: photoFileUrl
+    };
+    onSave(fullAnswers, false);
     setSuccessMsg('Draft pendaftaran berhasil disimpan sementara!');
     setTimeout(() => setSuccessMsg(null), 3000);
   };
@@ -250,7 +550,14 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
       return;
     }
 
-    onSave(answers, true);
+    // 🔥 Sertakan data foto dalam answers
+    const fullAnswers = {
+      ...answers,
+      photo_file_id: photoFileId,
+      photo_file_url: photoFileUrl
+    };
+    
+    onSave(fullAnswers, true);
     alert('Sukses! Data pendaftaran MPLS Anda berhasil dikirim secara penuh.');
     onClose();
   };
@@ -478,8 +785,31 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                             )}
                           </div>
 
-                          {/* Render Inputs dynamically */}
-                          {q.type === 'text' && (
+                          {/* ========================================================== */}
+                          {/* 🔥 UPLOAD FOTO - KHUSUS UNTUK Q98 (FOTO SISWA) */}
+                          {/* ========================================================== */}
+                          {q.id === 'q98' ? (
+                            <div className="space-y-2">
+                              <PhotoUpload
+                                studentNis={student.nis}
+                                studentName={student.name}
+                                onPhotoUploaded={handlePhotoUploaded}
+                                onPhotoError={handlePhotoError}
+                                existingPhotoUrl={photoFileUrl}
+                              />
+                              {photoError && (
+                                <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
+                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{photoError}</span>
+                                </div>
+                              )}
+                              {photoFileId && (
+                                <div className="text-[10px] text-emerald-600 bg-emerald-50 p-2 rounded-lg">
+                                  ✅ Foto sudah terupload (ID: {photoFileId.substring(0, 20)}...)
+                                </div>
+                              )}
+                            </div>
+                          ) : q.type === 'text' ? (
                             <input
                               type="text"
                               value={value || ''}
@@ -496,9 +826,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                     : 'border-[#D6D6C2] focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white'
                               }`}
                             />
-                          )}
-
-                          {q.type === 'date' && (
+                          ) : q.type === 'date' ? (
                             <input
                               type="date"
                               value={value || ''}
@@ -509,9 +837,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                   : 'border-[#D6D6C2] focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white'
                               }`}
                             />
-                          )}
-
-                          {q.type === 'select' && (
+                          ) : q.type === 'select' ? (
                             <select
                               value={value || ''}
                               onChange={(e) => handleInputChange(q.id, e.target.value)}
@@ -526,9 +852,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>
-                          )}
-
-                          {q.type === 'rating' && (
+                          ) : q.type === 'rating' ? (
                             <div className="flex items-center gap-1.5 py-1">
                               {[1, 2, 3, 4].map((num) => {
                                 const isSelected = Number(value) === num;
@@ -551,9 +875,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                 (1: Sangat Rendah/Tidak Pernah s/d 4: Sangat Minat/Sering)
                               </span>
                             </div>
-                          )}
-
-                          {q.type === 'multiselect' && (
+                          ) : q.type === 'multiselect' ? (
                             <div className="space-y-3">
                               {q.maxSelections && (
                                 <p className="text-[10px] font-bold text-[#5A5A40] uppercase font-mono">
@@ -599,23 +921,20 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                 })}
                               </div>
 
-                              {/* Other manual text option */}
                               {q.hasOther && (
                                 <div className="space-y-2 mt-2 pt-2 border-t border-[#E0E0D6]">
                                   <label className="text-xs text-[#8A8A70] font-medium">Lainnya (Tuliskan sendiri jika kotak di atas dipilih):</label>
                                   <input
                                     type="text"
                                     value={answers[`${q.id}_other`] || ''}
-                                    onChange={(e) => handleInputChange(`${`q${q.number}_other`}`, e.target.value)}
+                                    onChange={(e) => handleInputChange(`${q.id}_other`, e.target.value)}
                                     placeholder="Tuliskan isian manual lainnya di sini..."
                                     className="w-full px-4 py-2 rounded-lg border border-[#D6D6C2] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white text-[#33332D]"
                                   />
                                 </div>
                               )}
                             </div>
-                          )}
-
-                          {q.type === 'file' && (
+                          ) : q.type === 'file' ? (
                             <div className="space-y-3">
                               {value ? (
                                 <div className="flex items-center justify-between p-3 bg-[#EEF9F1] border border-emerald-200 rounded-xl">
@@ -639,7 +958,6 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                   <p className="text-xs font-semibold text-[#33332D]">Pilih atau Seret File Foto di sini</p>
                                   <p className="text-[10px] text-[#8A8A70] mt-1">Hanya mendukung format .jpg, .jpeg, .png (Ukuran wajib 100 s/d 500 KB)</p>
                                   
-                                  {/* Easy testing options */}
                                   <div className="flex flex-wrap justify-center gap-2 mt-4">
                                     <button
                                       type="button"
@@ -659,9 +977,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                 </div>
                               )}
                             </div>
-                          )}
-
-                          {q.type === 'location' && (
+                          ) : q.type === 'location' ? (
                             <div className="space-y-3">
                               <div className="flex gap-2">
                                 <input
@@ -686,10 +1002,10 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                 </button>
                               </div>
                               <p className="text-[10px] text-[#8A8A70]">
-                                Klik tombol di atas untuk mendeteksi posisi GPS perangkat Anda. Jika browser memblokir, sistem akan mensimulasikan koordinat akurat di wilayah Nglegok Blitar.
+                                Klik tombol di atas untuk mendeteksi posisi GPS perangkat Anda.
                               </p>
                             </div>
-                          )}
+                          ) : null}
 
                           {error && (
                             <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium">

@@ -31,6 +31,10 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   
+  // 🔥 STATE UNTUK REFRESH OTOMATIS
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   // Login Gate State
   const [loginStudent, setLoginStudent] = useState<Student | null>(null);
   const [nisPassword, setNisPassword] = useState('');
@@ -110,6 +114,9 @@ export default function App() {
       isMountedRef.current = false;
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
+      }
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
       }
     };
   }, []);
@@ -214,6 +221,39 @@ export default function App() {
   }, [googleSheetsUrl]);
 
   // ============================================================
+  // 🔥 REFRESH OTOMATIS SETIAP 30 DETIK (KETIKA DI DESKTOP)
+  // ============================================================
+  useEffect(() => {
+    // Hanya jalankan refresh otomatis jika tidak ada student yang login
+    if (!selectedStudent && !loginStudent) {
+      // Bersihkan interval lama
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+      
+      // Buat interval baru
+      const interval = setInterval(() => {
+        console.log('🔄 Refresh otomatis data dari Google Sheets...');
+        refreshDataFromSheets();
+      }, 30000); // 30 detik
+      
+      setRefreshInterval(interval);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    } else {
+      // Jika ada student login, hentikan refresh otomatis
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        setRefreshInterval(null);
+      }
+    }
+  }, [selectedStudent, loginStudent]);
+
+  // ============================================================
   // 5. SEMUA FUNGSI
   // ============================================================
 
@@ -231,6 +271,61 @@ export default function App() {
     setTimeout(() => {
       setUrlSavedSuccess(false);
     }, 4000);
+  };
+
+  // ============================================================
+  // 🔥 FUNGSI REFRESH DATA DARI SHEETS
+  // ============================================================
+  const refreshDataFromSheets = async () => {
+    if (!googleSheetsUrl.trim()) {
+      console.warn('⚠️ URL Google Sheets belum diset, skip refresh');
+      return;
+    }
+
+    if (isRefreshing) {
+      console.log('⏳ Refresh sedang berjalan, skip...');
+      return;
+    }
+
+    setIsRefreshing(true);
+    
+    try {
+      let response;
+      try {
+        response = await fetch(googleSheetsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'fetchStudents' })
+        });
+      } catch (postErr) {
+        const getUrl = googleSheetsUrl.includes('?') 
+          ? `${googleSheetsUrl}&action=fetchStudents` 
+          : `${googleSheetsUrl}?action=fetchStudents`;
+        response = await fetch(getUrl, { method: 'GET' });
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`HTTP Error: ${response?.status || 'Unknown'}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.status === 'success' && result.students && result.students.length > 0) {
+        // Update data tanpa mengganggu user yang sedang login
+        setStudents(result.students);
+        localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
+        localStorage.setItem('mpls_initial_load_done', 'true');
+        console.log(`✅ Refresh berhasil: ${result.students.length} data siswa dimuat`);
+      } else {
+        console.log('ℹ️ Refresh: Tidak ada data baru');
+      }
+    } catch (err) {
+      console.error('❌ Refresh gagal:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // ============================================================
@@ -471,10 +566,8 @@ export default function App() {
         setSaveStatus('success');
         setLastSaved(new Date());
         
-        // 🔥 Update localStorage dengan data terbaru
         localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(studentsToSync));
         
-        // Reset status setelah 2 detik
         setTimeout(() => {
           if (isMountedRef.current) {
             setAutoSyncStatus(prev => prev === 'success' ? 'idle' : prev);
@@ -489,7 +582,6 @@ export default function App() {
       setAutoSyncStatus('error');
       setSaveStatus('error');
       
-      // 🔥 Fallback: Simpan ke localStorage saja
       localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(studentsToSync));
       console.log('💾 Data disimpan ke localStorage (fallback)');
       
@@ -508,11 +600,9 @@ export default function App() {
   // 🔥 SAVE STUDENTS TO DB (DENGAN DEBOUNCE)
   // ============================================================
   const saveStudentsToDB = useCallback((updatedStudents: Student[]) => {
-    // Update state dan localStorage
     setStudents(updatedStudents);
     localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(updatedStudents));
     
-    // 🔥 DEBOUNCE: Tunggu 500ms sebelum sync ke Google Sheets
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
@@ -522,7 +612,6 @@ export default function App() {
       syncTimeoutRef.current = null;
     }, 500);
     
-    // Update status saving
     setSaveStatus('saving');
     setIsSaving(true);
     
@@ -737,7 +826,7 @@ export default function App() {
   };
 
   // ============================================================
-  // HANDLE STUDENT LOGIN
+  // 🔥 HANDLE STUDENT LOGIN - MODIFIED: HIDE NIS
   // ============================================================
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -848,7 +937,7 @@ export default function App() {
         onClose={() => {
           setSelectedStudent(null);
           // 🔥 Refresh data setelah form ditutup
-          handlePullSheets();
+          refreshDataFromSheets();
         }}
       />
     );
@@ -932,6 +1021,12 @@ export default function App() {
                     </span>
                   </div>
                 )}
+
+                {/* 🔥 INDICATOR REFRESH OTOMATIS */}
+                <div className="inline-flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold bg-white/5 border-white/10 text-[#E5E5D8]">
+                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span>Auto-Refresh 30s</span>
+                </div>
               </div>
               <h1 className="text-2xl md:text-3xl font-serif font-extrabold text-[#FDFCF8] tracking-tight">
                 Aplikasi Pendataan & Manajemen Talenta
@@ -1610,7 +1705,9 @@ export default function App() {
         </div>
       </footer>
 
-      {/* LOGIN MODAL */}
+      {/* ========================================================== */}
+      {/* 🔥 LOGIN MODAL - MODIFIED: HIDE NIS */}
+      {/* ========================================================== */}
       {loginStudent && (
         <div className="fixed inset-0 z-50 bg-[#33332D]/60 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-fade-in relative overflow-hidden">
@@ -1625,12 +1722,11 @@ export default function App() {
               <p className="text-xs text-[#8A8A70]">Masukkan NIS Anda untuk verifikasi identitas.</p>
             </div>
 
+            {/* 🔥 MODIFIED: Hanya Nama dan Jurusan, NIS dihilangkan */}
             <div className="bg-[#F5F5F0] rounded-xl p-4 border border-[#E0E0D6] space-y-1">
               <p className="text-[10px] font-bold text-[#8A8A70] uppercase tracking-wide">Biodata</p>
               <p className="text-sm font-extrabold text-[#33332D] leading-snug">{loginStudent.name}</p>
               <div className="flex items-center gap-3 text-[11px] text-[#5A5A40] mt-1">
-                <span className="font-mono">NIS: {loginStudent.nis}</span>
-                <span>&bull;</span>
                 <span>Jurusan: {loginStudent.answers.q11 || 'Belum Dipilih'}</span>
               </div>
             </div>
