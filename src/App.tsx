@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Student } from './types';
 import { getQuestionsList } from './questionsData';
 import { exportToCSV, calculateProgressPercent } from './utils';
@@ -26,6 +26,11 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  // 🔥 STATE UNTUK AUTO-UPDATE
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  
   // Login Gate State
   const [loginStudent, setLoginStudent] = useState<Student | null>(null);
   const [nisPassword, setNisPassword] = useState('');
@@ -33,22 +38,15 @@ export default function App() {
 
   // Sheets Syncing State
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState(() => {
-    // 🔥 Prioritaskan Environment Variables (Vercel)
     const envUrl = process.env.REACT_APP_GOOGLE_SHEETS_URL;
     if (envUrl && envUrl.startsWith('http')) {
-      console.log('✅ Menggunakan URL dari Environment Variables:', envUrl);
       return envUrl;
     }
-    // Fallback ke localStorage
     const localUrl = localStorage.getItem('mpls_google_sheets_url');
     if (localUrl && localUrl.startsWith('http')) {
-      console.log('✅ Menggunakan URL dari localStorage:', localUrl);
       return localUrl;
     }
-    // Default terakhir
-    const defaultUrl = 'https://script.google.com/macros/s/AKfycbx4t_4Py7SA8xNtfNgPng9l4H04IEg2m_CYHRPCHFSXrLnZrS8BO4fl-M9FX3qBHiPPcQ/exec';
-    console.log('⚠️ Menggunakan URL default:', defaultUrl);
-    return defaultUrl;
+    return 'https://script.google.com/macros/s/AKfycbx4t_4Py7SA8xNtfNgPng9l4H04IEg2m_CYHRPCHFSXrLnZrS8BO4fl-M9FX3qBHiPPcQ/exec';
   });
   const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState(googleSheetsUrl);
   const [urlSavedSuccess, setUrlSavedSuccess] = useState(false);
@@ -88,10 +86,15 @@ export default function App() {
   const [newStudentJurusan, setNewStudentJurusan] = useState('TKJ');
 
   // ============================================================
-  // 2. FUNGSI RESET FILTER GLOBAL
+  // 2. REF UNTUK DEBOUNCE
+  // ============================================================
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  // ============================================================
+  // 3. FUNGSI RESET FILTER GLOBAL
   // ============================================================
   const resetAllFilters = () => {
-    console.log('🔄 Reset semua filter...');
     setSearchQuery('');
     setJurusanFilter('All');
     setStatusFilter('All');
@@ -99,9 +102,18 @@ export default function App() {
   };
 
   // ============================================================
-  // 3. SEMUA useEffect
+  // 4. SEMUA useEffect
   // ============================================================
-  // Persist URL & Dev Unlocked State
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('mpls_google_sheets_url', googleSheetsUrl);
     setGoogleSheetsUrlInput(googleSheetsUrl);
@@ -111,7 +123,7 @@ export default function App() {
     localStorage.setItem('mpls_dev_unlocked', String(isDevUnlocked));
   }, [isDevUnlocked]);
 
-  // 🔥 LOAD STUDENTS - HANYA DARI LOCALSTORAGE (TANPA DEFAULT)
+  // Load students from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('mpls_smkn_nglegok_students');
     if (saved) {
@@ -121,7 +133,6 @@ export default function App() {
           setStudents(parsedData);
           console.log(`✅ ${parsedData.length} data siswa dimuat dari localStorage`);
         } else {
-          console.log('ℹ️ localStorage kosong, tunggu auto-fetch dari Google Sheets');
           setStudents([]);
         }
       } catch (e) {
@@ -129,7 +140,6 @@ export default function App() {
         setStudents([]);
       }
     } else {
-      console.log('ℹ️ Tidak ada data di localStorage, tunggu auto-fetch dari Google Sheets');
       setStudents([]);
     }
   }, []);
@@ -140,14 +150,12 @@ export default function App() {
   useEffect(() => {
     const hasLoaded = localStorage.getItem('mpls_initial_load_done');
     
-    // Jika sudah pernah load, skip auto-fetch
     if (hasLoaded === 'true') {
       console.log('ℹ️ Data sudah pernah dimuat, skip auto-fetch');
       setIsLoading(false);
       return;
     }
 
-    // Jika belum pernah load, lakukan auto-fetch
     const autoFetchData = async () => {
       console.log('🔄 Auto-fetch data dari Google Sheets...');
       setIsLoading(true);
@@ -162,7 +170,6 @@ export default function App() {
 
         let response;
         try {
-          // Coba dengan POST
           response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -185,13 +192,12 @@ export default function App() {
         const result = await response.json();
         
         if (result.status === 'success' && result.students && result.students.length > 0) {
-          // 🔥 HANYA SIMPAN DATA DARI GOOGLE SHEETS
           setStudents(result.students);
           localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
           localStorage.setItem('mpls_initial_load_done', 'true');
-          console.log(`✅ Auto-fetch berhasil: ${result.students.length} data siswa dimuat dari Google Sheets`);
+          console.log(`✅ Auto-fetch berhasil: ${result.students.length} data siswa dimuat`);
         } else {
-          console.log('ℹ️ Tidak ada data di Google Sheets, tampilkan tabel kosong');
+          console.log('ℹ️ Tidak ada data di Google Sheets');
           setStudents([]);
           localStorage.setItem('mpls_initial_load_done', 'true');
         }
@@ -208,10 +214,9 @@ export default function App() {
   }, [googleSheetsUrl]);
 
   // ============================================================
-  // 4. SEMUA FUNGSI LAINNYA
+  // 5. SEMUA FUNGSI
   // ============================================================
 
-  // Handle saving the custom Google Sheets URL
   const handleSaveSheetsUrl = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanUrl = googleSheetsUrlInput.trim();
@@ -229,7 +234,7 @@ export default function App() {
   };
 
   // ============================================================
-  // HANDLE DEVELOPER LOGIN
+  // 🔥 HANDLE DEVELOPER LOGIN
   // ============================================================
   const handleDevUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +290,7 @@ export default function App() {
             alert('✅ Akses developer berhasil dikonfirmasi!');
             return;
           } else {
-            setDevPasswordError('❌ Email atau Password salah! Gunakan data di sheet "developer" Google Sheets Anda.');
+            setDevPasswordError('❌ Email atau Password salah! Gunakan data di sheet "developer".');
             setIsVerifyingDev(false);
             return;
           }
@@ -299,14 +304,14 @@ export default function App() {
         return;
       }
     } else {
-      setDevPasswordError('❌ URL Google Sheets belum diset! Masukkan URL Web App Anda terlebih dahulu.');
+      setDevPasswordError('❌ URL Google Sheets belum diset!');
       setIsVerifyingDev(false);
       return;
     }
   };
 
   // ============================================================
-  // FUNGSI CEK KREDENSIAL
+  // 🔥 FUNGSI CEK KREDENSIAL
   // ============================================================
   const checkCurrentCredentials = async () => {
     if (!googleSheetsUrl.trim()) {
@@ -321,7 +326,7 @@ export default function App() {
       setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
     };
 
-    log('🔍 Mengecek kredensial developer yang tersimpan di Google Sheets...');
+    log('🔍 Mengecek kredensial developer...');
 
     try {
       let response;
@@ -346,10 +351,8 @@ export default function App() {
 
       const result = await response.json();
       log('✅ Berhasil terhubung ke Google Sheets!');
-      log('📋 Cek sheet "developer" di Google Sheets Anda:');
-      log('   - Cell A2 = Email developer (YANG BERLAKU)');
-      log('   - Cell B2 = Password developer (YANG BERLAKU)');
-      alert('🔍 Silakan buka Google Sheets Anda dan periksa:\n1. Sheet "developer"\n2. Cell A2 = Email developer yang berlaku\n3. Cell B2 = Password developer yang berlaku\n\nHANYA data di sheet ini yang bisa digunakan untuk login developer!');
+      log('📋 Cek sheet "developer" di Google Sheets Anda.');
+      alert('🔍 Periksa sheet "developer" di Google Sheets Anda:\nCell A2 = Email\nCell B2 = Password');
     } catch (err: any) {
       log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
       alert('❌ Gagal terhubung ke Google Sheets. Periksa URL Web App Anda.');
@@ -359,7 +362,7 @@ export default function App() {
   };
 
   // ============================================================
-  // HANDLE UPDATE DEVELOPER CREDENTIALS
+  // 🔥 HANDLE UPDATE DEVELOPER CREDENTIALS
   // ============================================================
   const handleUpdateDevCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -384,7 +387,7 @@ export default function App() {
     const hasSheetsUrl = googleSheetsUrl && googleSheetsUrl.startsWith('http');
     
     if (!hasSheetsUrl) {
-      setDevCredsError('❌ URL Google Sheets belum diset! Masukkan URL terlebih dahulu.');
+      setDevCredsError('❌ URL Google Sheets belum diset!');
       return;
     }
 
@@ -408,45 +411,52 @@ export default function App() {
         const result = await response.json();
         
         if (result && result.status === 'success') {
-          setDevCredsSuccess('✅ Berhasil! Kredensial developer telah diperbarui di Google Sheets.');
+          setDevCredsSuccess('✅ Berhasil! Kredensial developer telah diperbarui.');
           setDevCurrentEmail('');
           setDevCurrentPassword('');
           setDevNewEmail('');
           setDevNewPassword('');
         } else {
-          const errorMsg = result.message || 'Gagal memperbarui kredensial.';
-          setDevCredsError(`${errorMsg}`);
+          setDevCredsError(result.message || 'Gagal memperbarui kredensial.');
         }
       } else {
         throw new Error('Gagal menghubungi Google Sheets.');
       }
     } catch (err: any) {
       console.error(err);
-      if (err.message && err.message.includes('Failed to fetch')) {
-        setDevCredsError('❌ Gagal memperbarui (Failed to fetch). Pastikan URL Web App benar dan sudah di-deploy ulang.');
-      } else {
-        setDevCredsError('❌ Gagal memperbarui kredensial: ' + err.message);
-      }
+      setDevCredsError('❌ Gagal memperbarui: ' + err.message);
     } finally {
       setIsUpdatingDevCreds(false);
     }
   };
 
-  // Silent Auto-Syncing trigger
-  const triggerAutoSync = async (latestStudents: Student[]) => {
-    if (!googleSheetsUrl || !googleSheetsUrl.trim().startsWith('http')) return;
-    if (!latestStudents || latestStudents.length === 0) return;
-    
+  // ============================================================
+  // 🔥 FUNGSI SYNC KE GOOGLE SHEETS (DENGAN DEBOUNCE)
+  // ============================================================
+  const syncToGoogleSheets = useCallback(async (studentsToSync: Student[]) => {
+    if (!googleSheetsUrl || !googleSheetsUrl.trim().startsWith('http')) {
+      console.warn('⚠️ URL Google Sheets tidak valid, skip sync');
+      return;
+    }
+
+    if (!studentsToSync || studentsToSync.length === 0) {
+      console.warn('⚠️ Tidak ada data untuk disinkronkan');
+      return;
+    }
+
     setIsAutoSyncing(true);
     setAutoSyncStatus('syncing');
-    
+    setSaveStatus('saving');
+
     try {
+      console.log(`🔄 Menyinkronkan ${studentsToSync.length} data siswa ke Google Sheets...`);
+      
       const response = await fetch(googleSheetsUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
         },
-        body: JSON.stringify({ students: latestStudents })
+        body: JSON.stringify({ students: studentsToSync })
       });
 
       if (!response.ok) {
@@ -454,100 +464,72 @@ export default function App() {
       }
 
       const result = await response.json();
+      
       if (result.status === 'success' || result.status === 'ok') {
+        console.log('✅ Sinkronisasi berhasil:', result.message);
         setAutoSyncStatus('success');
+        setSaveStatus('success');
+        setLastSaved(new Date());
+        
+        // 🔥 Update localStorage dengan data terbaru
+        localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(studentsToSync));
+        
+        // Reset status setelah 2 detik
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setAutoSyncStatus(prev => prev === 'success' ? 'idle' : prev);
+            setSaveStatus('idle');
+          }
+        }, 2000);
       } else {
-        setAutoSyncStatus('error');
+        throw new Error(result.message || 'Sinkronisasi gagal');
       }
     } catch (err) {
-      console.warn('Auto sync error:', err);
-      try {
-        await fetch(googleSheetsUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ students: latestStudents })
-        });
-        setAutoSyncStatus('success');
-      } catch (fallbackErr) {
-        console.error('Auto sync failed:', fallbackErr);
-        setAutoSyncStatus('error');
-      }
+      console.error('❌ Sinkronisasi gagal:', err);
+      setAutoSyncStatus('error');
+      setSaveStatus('error');
+      
+      // 🔥 Fallback: Simpan ke localStorage saja
+      localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(studentsToSync));
+      console.log('💾 Data disimpan ke localStorage (fallback)');
+      
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setAutoSyncStatus('idle');
+          setSaveStatus('idle');
+        }
+      }, 3000);
     } finally {
       setIsAutoSyncing(false);
-      setTimeout(() => {
-        setAutoSyncStatus(prev => prev === 'success' ? 'idle' : prev);
-      }, 3000);
     }
-  };
+  }, [googleSheetsUrl]);
 
-  // Save database helper
-  const saveStudentsToDB = (updatedStudents: Student[]) => {
+  // ============================================================
+  // 🔥 SAVE STUDENTS TO DB (DENGAN DEBOUNCE)
+  // ============================================================
+  const saveStudentsToDB = useCallback((updatedStudents: Student[]) => {
+    // Update state dan localStorage
     setStudents(updatedStudents);
     localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(updatedStudents));
-    triggerAutoSync(updatedStudents);
-  };
+    
+    // 🔥 DEBOUNCE: Tunggu 500ms sebelum sync ke Google Sheets
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    syncTimeoutRef.current = setTimeout(() => {
+      syncToGoogleSheets(updatedStudents);
+      syncTimeoutRef.current = null;
+    }, 500);
+    
+    // Update status saving
+    setSaveStatus('saving');
+    setIsSaving(true);
+    
+  }, [syncToGoogleSheets]);
 
   // ============================================================
-  // HANDLE SYNC SHEETS
-  // ============================================================
-  const handleSyncSheets = async () => {
-    if (!googleSheetsUrl.trim()) {
-      alert('Masukkan URL Google Apps Script Web App terlebih dahulu!');
-      return;
-    }
-
-    if (!students || students.length === 0) {
-      alert('Tidak ada data siswa untuk disinkronkan!');
-      return;
-    }
-
-    setIsSyncing(true);
-    setSyncLogs([]);
-
-    const log = (msg: string) => {
-      setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
-    };
-
-    log('Menghubungkan ke API Google Apps Script Web App...');
-    log(`Menemukan ${students.length} data baris siswa...`);
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      log('Mengirim payload data siswa ke Google Sheets...');
-
-      const response = await fetch(googleSheetsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify({ students })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      if (result.status === 'success' || result.status === 'ok') {
-        log(`✓ BERHASIL: ${result.message || 'Sinkronisasi selesai!'}`);
-        log('⏳ Menarik data terbaru dari Google Sheets...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await handlePullSheets();
-      } else {
-        log(`⚠️ Respon Server: ${result.message || 'Ada peringatan dari server'}`);
-      }
-    } catch (err: any) {
-      log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // ============================================================
-  // HANDLE PULL SHEETS
+  // 🔥 HANDLE PULL SHEETS
   // ============================================================
   const handlePullSheets = async () => {
     if (!googleSheetsUrl.trim()) {
@@ -562,12 +544,12 @@ export default function App() {
       setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
     };
 
-    log('Menghubungkan ke API Google Apps Script Web App...');
-    log('Mempersiapkan penarikan data siswa dari Google Sheets...');
+    log('Menghubungkan ke API Google Apps Script...');
+    log('Mempersiapkan penarikan data siswa...');
 
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
-      log('Mengirim permintaan "fetchStudents" ke Google Sheets...');
+      log('Mengirim permintaan "fetchStudents"...');
 
       let response;
 
@@ -600,50 +582,109 @@ export default function App() {
       
       if (result.status === 'success' && result.students) {
         const importedCount = result.students.length;
-        log(`✓ BERHASIL: Menemukan ${importedCount} data siswa di Google Sheets.`);
+        log(`✓ BERHASIL: Menemukan ${importedCount} data siswa.`);
         
         if (importedCount > 0) {
-          // 🔥 SIMPAN DATA DARI GOOGLE SHEETS (TANPA DEFAULT)
           setStudents(result.students);
           localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
           localStorage.setItem('mpls_initial_load_done', 'true');
           resetAllFilters();
-          log(`✓ ${importedCount} data siswa berhasil dimuat dari Google Sheets!`);
-          alert(`Berhasil menarik data! ${importedCount} data siswa dari Google Sheets telah diimpor ke dalam aplikasi.`);
+          log(`✓ ${importedCount} data siswa berhasil dimuat!`);
+          alert(`Berhasil menarik data! ${importedCount} data siswa dari Google Sheets telah diimpor.`);
         } else {
           log('⚠️ Google Sheets mengembalikan 0 baris siswa.');
           setStudents([]);
           localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify([]));
-          alert('Berhasil terhubung ke Google Sheets, namun tidak ditemukan data siswa pada sheet "Data Siswa".');
+          alert('Berhasil terhubung ke Google Sheets, namun tidak ditemukan data siswa.');
         }
       } else {
         throw new Error(result.message || 'Gagal mengambil data siswa.');
       }
     } catch (err: any) {
-      console.error('Gagal mengambil data dari Google Sheets:', err);
-      log(`❌ GAGAL: ${err.message || 'Koneksi ditolak atau URL salah'}`);
+      console.error('Gagal mengambil data:', err);
+      log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
       alert(`Gagal mengambil data siswa!\n\nError: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  // Reset database
+  // ============================================================
+  // 🔥 HANDLE SYNC SHEETS (MANUAL)
+  // ============================================================
+  const handleSyncSheets = async () => {
+    if (!googleSheetsUrl.trim()) {
+      alert('Masukkan URL Google Apps Script Web App terlebih dahulu!');
+      return;
+    }
+
+    if (!students || students.length === 0) {
+      alert('Tidak ada data siswa untuk disinkronkan!');
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncLogs([]);
+
+    const log = (msg: string) => {
+      setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
+    };
+
+    log('Menghubungkan ke API Google Apps Script...');
+    log(`Menemukan ${students.length} data siswa...`);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      log('Mengirim data ke Google Sheets...');
+
+      const response = await fetch(googleSheetsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({ students })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.status === 'success' || result.status === 'ok') {
+        log(`✓ BERHASIL: ${result.message || 'Sinkronisasi selesai!'}`);
+        setLastSaved(new Date());
+        alert('✅ Sinkronisasi berhasil! Data telah diperbarui di Google Sheets.');
+      } else {
+        log(`⚠️ Respon Server: ${result.message || 'Ada peringatan dari server'}`);
+      }
+    } catch (err: any) {
+      log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
+      alert('❌ Gagal sinkronisasi. Periksa koneksi dan URL Web App.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // ============================================================
+  // HANDLE RESET DATABASE
+  // ============================================================
   const handleResetDatabase = () => {
     if (!isDevUnlocked) {
       alert('Akses ditolak! Anda harus masuk sebagai developer.');
       return;
     }
-    if (confirm('Apakah Anda yakin ingin menghapus SEMUA data siswa dari aplikasi? Data di Google Sheets TIDAK akan terhapus.')) {
+    if (confirm('Apakah Anda yakin ingin menghapus SEMUA data siswa dari aplikasi?')) {
       setStudents([]);
       localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify([]));
       localStorage.removeItem('mpls_initial_load_done');
       resetAllFilters();
-      alert('✅ Semua data siswa telah dihapus dari aplikasi. Silakan tarik data dari Google Sheets untuk memuat ulang.');
+      alert('✅ Semua data siswa telah dihapus.');
     }
   };
 
-  // Add new student
+  // ============================================================
+  // HANDLE ADD STUDENT
+  // ============================================================
   const handleAddStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isDevUnlocked) {
@@ -680,20 +721,24 @@ export default function App() {
     alert(`Siswa ${newStudent.name} berhasil ditambahkan.`);
   };
 
-  // Delete student
+  // ============================================================
+  // HANDLE DELETE STUDENT
+  // ============================================================
   const handleDeleteStudent = (studentId: string, studentName: string) => {
     if (!isDevUnlocked) {
       alert('Akses ditolak!');
       return;
     }
-    if (confirm(`Apakah Anda yakin ingin menghapus siswa "${studentName}" dari aplikasi?`)) {
+    if (confirm(`Apakah Anda yakin ingin menghapus siswa "${studentName}"?`)) {
       const updated = students.filter(s => s.id !== studentId);
       saveStudentsToDB(updated);
       alert(`Siswa ${studentName} berhasil dihapus.`);
     }
   };
 
-  // Student login
+  // ============================================================
+  // HANDLE STUDENT LOGIN
+  // ============================================================
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginStudent) return;
@@ -708,7 +753,9 @@ export default function App() {
     }
   };
 
-  // Save student answers
+  // ============================================================
+  // 🔥 HANDLE SAVE STUDENT ANSWERS (DENGAN AUTO-UPDATE)
+  // ============================================================
   const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boolean) => {
     if (!selectedStudent) return;
 
@@ -722,6 +769,7 @@ export default function App() {
       progressState = 'in_progress';
     }
 
+    // 🔥 Update data siswa
     const updated = students.map(s => {
       if (s.id === selectedStudent.id) {
         return {
@@ -735,10 +783,19 @@ export default function App() {
       return s;
     });
 
+    // 🔥 Simpan dengan debounce (akan auto-sync ke Google Sheets)
     saveStudentsToDB(updated);
+    
+    // 🔥 Update selectedStudent agar form tetap sinkron
+    const updatedSelected = updated.find(s => s.id === selectedStudent.id);
+    if (updatedSelected) {
+      setSelectedStudent(updatedSelected);
+    }
   };
 
-  // Filter students
+  // ============================================================
+  // FILTER STUDENTS
+  // ============================================================
   const filteredStudents = students.filter(student => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = student.name.toLowerCase().includes(query) || student.nis.includes(query);
@@ -747,7 +804,9 @@ export default function App() {
     return matchesSearch && matchesJurusan && matchesStatus;
   });
 
-  // Stats
+  // ============================================================
+  // STATS
+  // ============================================================
   const totalStudentsCount = students.length;
   const completedCount = students.filter(s => s.progress === 'completed').length;
   const inProgressCount = students.filter(s => s.progress === 'in_progress').length;
@@ -757,7 +816,9 @@ export default function App() {
   const inProgressPercent = totalStudentsCount > 0 ? Math.round((inProgressCount / totalStudentsCount) * 100) : 0;
   const notStartedPercent = totalStudentsCount > 0 ? Math.round((notStartedCount / totalStudentsCount) * 100) : 0;
 
-  // Pagination
+  // ============================================================
+  // PAGINATION
+  // ============================================================
   const totalPages = Math.ceil(filteredStudents.length / pageSize);
   const paginatedStudents = filteredStudents.slice(
     (currentPage - 1) * pageSize,
@@ -765,7 +826,7 @@ export default function App() {
   );
 
   // ============================================================
-  // 5. LOADING SCREEN
+  // LOADING SCREEN
   // ============================================================
   if (isLoading) {
     return (
@@ -773,7 +834,6 @@ export default function App() {
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5A5A40] mx-auto"></div>
           <p className="text-sm text-[#8A8A70]">Memuat data dari Google Sheets...</p>
-          <p className="text-xs text-[#8A8A70]">Mohon tunggu sebentar</p>
         </div>
       </div>
     );
@@ -785,13 +845,17 @@ export default function App() {
       <StudentForm
         student={selectedStudent}
         onSave={handleSaveStudentAnswers}
-        onClose={() => setSelectedStudent(null)}
+        onClose={() => {
+          setSelectedStudent(null);
+          // 🔥 Refresh data setelah form ditutup
+          handlePullSheets();
+        }}
       />
     );
   }
 
   // ============================================================
-  // 6. RETURN / RENDER JSX (SAMA SEPERTI SEBELUMNYA)
+  // RENDER JSX
   // ============================================================
   return (
     <div className="min-h-screen bg-[#FDFCF8] text-[#33332D] font-sans antialiased">
@@ -805,7 +869,37 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 px-3 py-1 rounded-full text-xs font-bold text-white">
                   <Sparkles className="w-3.5 h-3.5" />
-                  Masa Pengenalan Lingkungan Sekolah (MPLS) 2026
+                  MPLS 2026
+                </div>
+
+                {/* 🔥 STATUS SAVE / SYNC */}
+                <div className={`inline-flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 ${
+                  saveStatus === 'saving' || isAutoSyncing
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : saveStatus === 'success'
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                    : saveStatus === 'error'
+                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                    : 'bg-white/5 border-white/10 text-[#E5E5D8]'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    saveStatus === 'saving' || isAutoSyncing
+                      ? 'bg-amber-400 animate-ping'
+                      : saveStatus === 'success'
+                      ? 'bg-emerald-400'
+                      : saveStatus === 'error'
+                      ? 'bg-rose-400'
+                      : 'bg-emerald-500'
+                  }`} />
+                  <span>
+                    {saveStatus === 'saving' || isAutoSyncing
+                      ? 'Menyimpan...' 
+                      : saveStatus === 'success'
+                      ? 'Tersimpan ✓' 
+                      : saveStatus === 'error'
+                      ? 'Gagal Simpan!' 
+                      : lastSaved ? `Terakhir: ${lastSaved.toLocaleTimeString('id-ID')}` : 'Siap'}
+                  </span>
                 </div>
 
                 {googleSheetsUrl && googleSheetsUrl.trim().startsWith('http') && (
@@ -829,12 +923,12 @@ export default function App() {
                     }`} />
                     <span>
                       {isAutoSyncing 
-                        ? 'Auto-Syncing...' 
+                        ? 'Sync...' 
                         : autoSyncStatus === 'success'
-                        ? 'Auto-Sync Berhasil' 
+                        ? 'Sync OK' 
                         : autoSyncStatus === 'error'
-                        ? 'Auto-Sync Gagal' 
-                        : 'Google Sheets Aktif'}
+                        ? 'Sync Gagal' 
+                        : 'Google Sheets'}
                     </span>
                   </div>
                 )}
@@ -877,7 +971,7 @@ export default function App() {
               </div>
               <div>
                 <p className="text-4xl font-serif font-extrabold text-[#33332D] tracking-tight">{totalStudentsCount}</p>
-                <p className="text-xs text-[#8A8A70] mt-1">Total siswa yang diterima masuk di SMKN 1 Nglegok.</p>
+                <p className="text-xs text-[#8A8A70] mt-1">Total siswa yang diterima masuk.</p>
               </div>
               <div className="border-t border-[#F0F0E6] mt-4 pt-3 flex items-center justify-between text-[11px] text-[#8A8A70]">
                 <span>Daftar pendaftaran dibuka</span>
@@ -938,7 +1032,7 @@ export default function App() {
           <div className="lg:col-span-4 bg-white border border-[#D6D6C2] rounded-2xl p-6 flex flex-col justify-between shadow-xs">
             <div>
               <h3 className="text-sm font-bold text-[#33332D] tracking-tight">Presentase Partisipasi Siswa</h3>
-              <p className="text-[11px] text-[#8A8A70] mt-0.5">Distribusi status pengisian kuesioner MPLS.</p>
+              <p className="text-[11px] text-[#8A8A70] mt-0.5">Distribusi status pengisian kuesioner.</p>
             </div>
 
             <div className="my-6 flex items-center justify-center relative">
@@ -995,7 +1089,7 @@ export default function App() {
               </div>
               <h4 className="text-base font-extrabold text-[#33332D]">Sinkronisasi & Konfigurasi Lembar Data</h4>
               <p className="text-xs text-[#8A8A70] leading-relaxed">
-                Koneksikan langsung data kuesioner 166 kolom siswa baru dengan Spreadsheet sekolah Anda.
+                Koneksikan langsung data kuesioner dengan Spreadsheet sekolah Anda.
               </p>
 
               <div className="space-y-1.5 bg-[#FDFCF8] p-3 rounded-xl border border-[#D6D6C2]/60">
@@ -1111,7 +1205,7 @@ export default function App() {
 
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[10px] text-amber-800">
                       <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
-                      Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
+                      Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code>.
                     </div>
 
                     {devCredsError && (
@@ -1275,13 +1369,13 @@ export default function App() {
                 <Search className="w-4 h-4 absolute left-3 top-3 text-[#8A8A70]" />
                 <input
                   type="text"
-                  placeholder="Cari berdasarkan Nama atau Nomor NIS..."
+                  placeholder="Cari berdasarkan Nama atau NIS..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg pl-9 pr-4 py-2 text-xs text-[#33332D] placeholder-[#8A8A70] focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg pl-9 pr-4 py-2 text-xs text-[#33332D] placeholder-[#8A8A70] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
                 />
               </div>
 
@@ -1294,14 +1388,14 @@ export default function App() {
                   }}
                   className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
                 >
-                  <option value="All">Semua Program Keahlian (Jurusan)</option>
-                  <option value="TKR">TKR (Teknik Kendaraan Ringan)</option>
-                  <option value="TSM">TSM (Teknik Sepeda Motor)</option>
-                  <option value="TEI">TEI (Teknik Elektronika Industri)</option>
-                  <option value="TKJ">TKJ (Teknik Komputer Jaringan)</option>
-                  <option value="TB">TB (Tata Boga)</option>
-                  <option value="BDP">BDP (Bisnis Daring Pemasaran)</option>
-                  <option value="AKL">AKL (Akuntansi)</option>
+                  <option value="All">Semua Program Keahlian</option>
+                  <option value="TKR">TKR</option>
+                  <option value="TSM">TSM</option>
+                  <option value="TEI">TEI</option>
+                  <option value="TKJ">TKJ</option>
+                  <option value="TB">TB</option>
+                  <option value="BDP">BDP</option>
+                  <option value="AKL">AKL</option>
                 </select>
               </div>
 
@@ -1314,10 +1408,10 @@ export default function App() {
                   }}
                   className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
                 >
-                  <option value="All">Semua Status Progress</option>
-                  <option value="completed">Sudah Selesai (Hijau)</option>
-                  <option value="in_progress">Proses Mengisi (Kuning)</option>
-                  <option value="not_started">Belum Mengisi (Merah)</option>
+                  <option value="All">Semua Status</option>
+                  <option value="completed">Sudah Selesai</option>
+                  <option value="in_progress">Proses Mengisi</option>
+                  <option value="not_started">Belum Mengisi</option>
                 </select>
               </div>
 
@@ -1356,21 +1450,21 @@ export default function App() {
             ) : filteredStudents.length === 0 ? (
               <div className="text-center py-12 text-[#8A8A70]">
                 <AlertCircle className="w-8 h-8 text-[#8A8A70] mx-auto mb-2" />
-                <p className="text-sm font-semibold">Tidak ada siswa yang cocok dengan kriteria pencarian</p>
-                <p className="text-xs text-[#8A8A70] mt-1">Coba periksa kata kunci atau ubah filter dropdown Anda.</p>
+                <p className="text-sm font-semibold">Tidak ada siswa yang cocok</p>
+                <p className="text-xs text-[#8A8A70] mt-1">Coba periksa kata kunci atau ubah filter.</p>
               </div>
             ) : (
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#F5F5F0] text-[#8A8A70] text-[11px] font-bold tracking-wider uppercase border-b border-[#E0E0D6]">
                     <th className="py-4 px-6">No</th>
-                    {isDevUnlocked && <th className="py-4 px-6">Nomor NIS</th>}
-                    <th className="py-4 px-6">Nama Lengkap Siswa</th>
-                    <th className="py-4 px-6">Keahlian (Jurusan)</th>
-                    <th className="py-4 px-6">Progres Pengisian</th>
+                    {isDevUnlocked && <th className="py-4 px-6">NIS</th>}
+                    <th className="py-4 px-6">Nama Lengkap</th>
+                    <th className="py-4 px-6">Jurusan</th>
+                    <th className="py-4 px-6">Progres</th>
                     <th className="py-4 px-6">Status</th>
-                    <th className="py-4 px-6">Terakhir Pembaruan</th>
-                    <th className="py-4 px-6 text-right">Aksi Tindakan</th>
+                    <th className="py-4 px-6">Terakhir Update</th>
+                    <th className="py-4 px-6 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F0F0E6] text-xs">
@@ -1387,14 +1481,14 @@ export default function App() {
                       statusBadge = (
                         <span className="inline-flex items-center gap-1.5 bg-[#EEF9F1] border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                          Sudah Selesai
+                          Selesai
                         </span>
                       );
                     } else if (student.progress === 'in_progress') {
                       statusBadge = (
                         <span className="inline-flex items-center gap-1.5 bg-[#FFFBEB] border border-amber-200 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                          Proses Mengisi
+                          Proses
                         </span>
                       );
                     }
@@ -1732,7 +1826,7 @@ export default function App() {
               </div>
 
               <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-3 text-[11px] text-[#5A5A40] leading-relaxed">
-                <strong>🔒 Informasi:</strong> Hanya data di sheet <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developer</code> yang berlaku. Password default (admin123) SUDAH TIDAK BERLAKU!
+                <strong>🔒 Informasi:</strong> Hanya data di sheet <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developer</code> yang berlaku.
               </div>
 
               <div className="flex gap-2">
