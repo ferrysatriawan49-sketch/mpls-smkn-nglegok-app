@@ -1,0 +1,6 @@
+{
+  "name": "MPLS SMK Nglegok",
+  "description": "Aplikasi Manajemen Talenta & Pendataan Siswa Baru Masa MPLS SMKN 1 Nglegok Blitar Terintegrasi Dashboard Real-time",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
