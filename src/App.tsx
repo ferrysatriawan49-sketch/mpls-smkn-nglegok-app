@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Student } from './types';
-import { INITIAL_STUDENTS } from './initialStudents';
 import { getQuestionsList } from './questionsData';
 import { exportToCSV, calculateProgressPercent } from './utils';
 import StudentForm from './components/StudentForm';
@@ -25,7 +24,7 @@ export default function App() {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // 🔥 UNTUK LOADING SCREEN
+  const [isLoading, setIsLoading] = useState(true);
   
   // Login Gate State
   const [loginStudent, setLoginStudent] = useState<Student | null>(null);
@@ -97,14 +96,6 @@ export default function App() {
     setJurusanFilter('All');
     setStatusFilter('All');
     setCurrentPage(1);
-    setTimeout(() => {
-      console.log('✅ State setelah reset:', {
-        searchQuery: '',
-        jurusanFilter: 'All',
-        statusFilter: 'All',
-        currentPage: 1
-      });
-    }, 50);
   };
 
   // ============================================================
@@ -120,26 +111,31 @@ export default function App() {
     localStorage.setItem('mpls_dev_unlocked', String(isDevUnlocked));
   }, [isDevUnlocked]);
 
-  // Load students from localStorage
+  // 🔥 LOAD STUDENTS - HANYA DARI LOCALSTORAGE (TANPA DEFAULT)
   useEffect(() => {
     const saved = localStorage.getItem('mpls_smkn_nglegok_students');
     if (saved) {
       try {
-        setStudents(JSON.parse(saved));
-        console.log('✅ Data siswa dimuat dari localStorage');
+        const parsedData = JSON.parse(saved);
+        if (parsedData && parsedData.length > 0) {
+          setStudents(parsedData);
+          console.log(`✅ ${parsedData.length} data siswa dimuat dari localStorage`);
+        } else {
+          console.log('ℹ️ localStorage kosong, tunggu auto-fetch dari Google Sheets');
+          setStudents([]);
+        }
       } catch (e) {
-        setStudents(INITIAL_STUDENTS);
-        console.log('⚠️ Gagal parse localStorage, gunakan data default');
+        console.warn('⚠️ Gagal parse localStorage:', e);
+        setStudents([]);
       }
     } else {
-      setStudents(INITIAL_STUDENTS);
-      localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(INITIAL_STUDENTS));
-      console.log('📝 Data default disimpan ke localStorage');
+      console.log('ℹ️ Tidak ada data di localStorage, tunggu auto-fetch dari Google Sheets');
+      setStudents([]);
     }
   }, []);
 
   // ============================================================
-  // 🔥 AUTO-FETCH DATA DARI GOOGLE SHEETS (BARU)
+  // 🔥 AUTO-FETCH DATA DARI GOOGLE SHEETS
   // ============================================================
   useEffect(() => {
     const hasLoaded = localStorage.getItem('mpls_initial_load_done');
@@ -189,19 +185,19 @@ export default function App() {
         const result = await response.json();
         
         if (result.status === 'success' && result.students && result.students.length > 0) {
-          // Simpan data ke state dan localStorage
+          // 🔥 HANYA SIMPAN DATA DARI GOOGLE SHEETS
           setStudents(result.students);
           localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
           localStorage.setItem('mpls_initial_load_done', 'true');
           console.log(`✅ Auto-fetch berhasil: ${result.students.length} data siswa dimuat dari Google Sheets`);
         } else {
-          console.log('ℹ️ Tidak ada data di Google Sheets, gunakan data default');
-          // Tetap tandai sudah load agar tidak fetch ulang
+          console.log('ℹ️ Tidak ada data di Google Sheets, tampilkan tabel kosong');
+          setStudents([]);
           localStorage.setItem('mpls_initial_load_done', 'true');
         }
       } catch (err) {
         console.error('❌ Auto-fetch gagal:', err);
-        // Tetap tandai sudah load agar tidak fetch ulang terus
+        setStudents([]);
         localStorage.setItem('mpls_initial_load_done', 'true');
       } finally {
         setIsLoading(false);
@@ -233,7 +229,7 @@ export default function App() {
   };
 
   // ============================================================
-  // HANDLE DEVELOPER LOGIN - TANPA FALLBACK DEFAULT
+  // HANDLE DEVELOPER LOGIN
   // ============================================================
   const handleDevUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,7 +250,6 @@ export default function App() {
       try {
         let response;
         try {
-          // Coba dengan GET dulu
           const getUrl = `${googleSheetsUrl}${googleSheetsUrl.includes('?') ? '&' : '?'}action=verifyDeveloper&email=${encodeURIComponent(cleanEmail)}&password=${encodeURIComponent(cleanPassword)}`;
           response = await fetch(getUrl, { 
             method: 'GET',
@@ -290,7 +285,7 @@ export default function App() {
             alert('✅ Akses developer berhasil dikonfirmasi!');
             return;
           } else {
-            setDevPasswordError('❌ Email atau Password salah! Password default (admin123) SUDAH TIDAK BERLAKU. Gunakan data di sheet "developer" Google Sheets Anda.');
+            setDevPasswordError('❌ Email atau Password salah! Gunakan data di sheet "developer" Google Sheets Anda.');
             setIsVerifyingDev(false);
             return;
           }
@@ -354,8 +349,7 @@ export default function App() {
       log('📋 Cek sheet "developer" di Google Sheets Anda:');
       log('   - Cell A2 = Email developer (YANG BERLAKU)');
       log('   - Cell B2 = Password developer (YANG BERLAKU)');
-      log('   - ⚠️ Password default (admin123) SUDAH TIDAK BERLAKU!');
-      alert('🔍 INGAT! Password default (admin123) SUDAH TIDAK BERLAKU!\n\nSilakan buka Google Sheets Anda dan periksa:\n1. Sheet "developer"\n2. Cell A2 = Email developer yang berlaku\n3. Cell B2 = Password developer yang berlaku\n\nHANYA data di sheet ini yang bisa digunakan untuk login developer!');
+      alert('🔍 Silakan buka Google Sheets Anda dan periksa:\n1. Sheet "developer"\n2. Cell A2 = Email developer yang berlaku\n3. Cell B2 = Password developer yang berlaku\n\nHANYA data di sheet ini yang bisa digunakan untuk login developer!');
     } catch (err: any) {
       log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
       alert('❌ Gagal terhubung ke Google Sheets. Periksa URL Web App Anda.');
@@ -389,13 +383,6 @@ export default function App() {
 
     const hasSheetsUrl = googleSheetsUrl && googleSheetsUrl.startsWith('http');
     
-    console.log('📤 Mengirim data update:', {
-      currentEmail: currentEmailClean,
-      currentPassword: currentPasswordClean,
-      newEmail: newEmailClean,
-      newPassword: newPasswordClean
-    });
-
     if (!hasSheetsUrl) {
       setDevCredsError('❌ URL Google Sheets belum diset! Masukkan URL terlebih dahulu.');
       return;
@@ -419,7 +406,6 @@ export default function App() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('📥 Response dari server:', result);
         
         if (result && result.status === 'success') {
           setDevCredsSuccess('✅ Berhasil! Kredensial developer telah diperbarui di Google Sheets.');
@@ -427,20 +413,9 @@ export default function App() {
           setDevCurrentPassword('');
           setDevNewEmail('');
           setDevNewPassword('');
-          
-          if (result.debug) {
-            console.log('🔍 Debug info:', result.debug);
-          }
         } else {
           const errorMsg = result.message || 'Gagal memperbarui kredensial.';
-          const debugInfo = result.debug ? 
-            `\n\n📋 Debug:\n- Email stored: ${result.debug.storedEmail}\n- Password stored: ${result.debug.storedPassword}\n- Email input: ${result.debug.inputEmail}\n- Password input: ${result.debug.inputPassword}\n- Email match: ${result.debug.emailMatch}\n- Password match: ${result.debug.passwordMatch}` 
-            : '';
-          setDevCredsError(`${errorMsg}${debugInfo}`);
-          
-          if (result.debug) {
-            alert(`❌ Gagal memperbarui!\n\nEmail tersimpan: ${result.debug.storedEmail}\nPassword tersimpan: ${result.debug.storedPassword}\n\nEmail yang dimasukkan: ${result.debug.inputEmail}\nPassword yang dimasukkan: ${result.debug.inputPassword}\n\n⚠️ Password default (admin123) SUDAH TIDAK BERLAKU! Gunakan data di sheet "developer".`);
-          }
+          setDevCredsError(`${errorMsg}`);
         }
       } else {
         throw new Error('Gagal menghubungi Google Sheets.');
@@ -460,6 +435,7 @@ export default function App() {
   // Silent Auto-Syncing trigger
   const triggerAutoSync = async (latestStudents: Student[]) => {
     if (!googleSheetsUrl || !googleSheetsUrl.trim().startsWith('http')) return;
+    if (!latestStudents || latestStudents.length === 0) return;
     
     setIsAutoSyncing(true);
     setAutoSyncStatus('syncing');
@@ -515,11 +491,16 @@ export default function App() {
   };
 
   // ============================================================
-  // HANDLE SYNC SHEETS - dengan auto-refresh
+  // HANDLE SYNC SHEETS
   // ============================================================
   const handleSyncSheets = async () => {
     if (!googleSheetsUrl.trim()) {
       alert('Masukkan URL Google Apps Script Web App terlebih dahulu!');
+      return;
+    }
+
+    if (!students || students.length === 0) {
+      alert('Tidak ada data siswa untuk disinkronkan!');
       return;
     }
 
@@ -566,7 +547,7 @@ export default function App() {
   };
 
   // ============================================================
-  // HANDLE PULL SHEETS - dengan reset filter
+  // HANDLE PULL SHEETS
   // ============================================================
   const handlePullSheets = async () => {
     if (!googleSheetsUrl.trim()) {
@@ -622,14 +603,17 @@ export default function App() {
         log(`✓ BERHASIL: Menemukan ${importedCount} data siswa di Google Sheets.`);
         
         if (importedCount > 0) {
-          saveStudentsToDB(result.students);
-          localStorage.setItem('mpls_initial_load_done', 'true'); // 🔥 TANDAI SUDAH LOAD
+          // 🔥 SIMPAN DATA DARI GOOGLE SHEETS (TANPA DEFAULT)
+          setStudents(result.students);
+          localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(result.students));
+          localStorage.setItem('mpls_initial_load_done', 'true');
           resetAllFilters();
-          log('✓ Database lokal telah disinkronkan dengan data Google Sheets terbaru!');
-          log('✓ Filter otomatis di-reset ke default.');
-          alert(`Berhasil menarik data! ${importedCount} data siswa dari Google Sheets telah diimpor ke dalam aplikasi.\n\nFilter otomatis di-reset.`);
+          log(`✓ ${importedCount} data siswa berhasil dimuat dari Google Sheets!`);
+          alert(`Berhasil menarik data! ${importedCount} data siswa dari Google Sheets telah diimpor ke dalam aplikasi.`);
         } else {
           log('⚠️ Google Sheets mengembalikan 0 baris siswa.');
+          setStudents([]);
+          localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify([]));
           alert('Berhasil terhubung ke Google Sheets, namun tidak ditemukan data siswa pada sheet "Data Siswa".');
         }
       } else {
@@ -650,10 +634,12 @@ export default function App() {
       alert('Akses ditolak! Anda harus masuk sebagai developer.');
       return;
     }
-    if (confirm('Apakah Anda yakin ingin mereset seluruh database pendaftaran ke roster default awal?')) {
-      saveStudentsToDB(INITIAL_STUDENTS);
+    if (confirm('Apakah Anda yakin ingin menghapus SEMUA data siswa dari aplikasi? Data di Google Sheets TIDAK akan terhapus.')) {
+      setStudents([]);
+      localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify([]));
+      localStorage.removeItem('mpls_initial_load_done');
       resetAllFilters();
-      alert('Database berhasil di-reset ke roster default.');
+      alert('✅ Semua data siswa telah dihapus dari aplikasi. Silakan tarik data dari Google Sheets untuk memuat ulang.');
     }
   };
 
@@ -700,7 +686,7 @@ export default function App() {
       alert('Akses ditolak!');
       return;
     }
-    if (confirm(`Apakah Anda yakin ingin menghapus siswa "${studentName}"?`)) {
+    if (confirm(`Apakah Anda yakin ingin menghapus siswa "${studentName}" dari aplikasi?`)) {
       const updated = students.filter(s => s.id !== studentId);
       saveStudentsToDB(updated);
       alert(`Siswa ${studentName} berhasil dihapus.`);
@@ -805,7 +791,7 @@ export default function App() {
   }
 
   // ============================================================
-  // 6. RETURN / RENDER JSX
+  // 6. RETURN / RENDER JSX (SAMA SEPERTI SEBELUMNYA)
   // ============================================================
   return (
     <div className="min-h-screen bg-[#FDFCF8] text-[#33332D] font-sans antialiased">
@@ -1123,7 +1109,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 🔥 PERINGATAN PASSWORD DEFAULT */}
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[10px] text-amber-800">
                       <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
                       Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
@@ -1164,7 +1149,7 @@ export default function App() {
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   onClick={handleSyncSheets}
-                  disabled={isSyncing}
+                  disabled={isSyncing || students.length === 0}
                   className="flex items-center gap-1.5 bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#E5E5D8] text-white disabled:text-[#8A8A70] px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -1197,7 +1182,8 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => exportToCSV(students)}
-                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs"
+                  disabled={students.length === 0}
+                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5 text-[#5A5A40]" />
                   Unduh CSV
@@ -1233,7 +1219,11 @@ export default function App() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h3 className="text-base font-bold text-[#33332D]">Daftar Penerimaan Roster Siswa Baru</h3>
-                <p className="text-xs text-[#8A8A70] mt-0.5">Pilih nama siswa pada tabel di bawah untuk mulai mengisi data pendaftaran.</p>
+                <p className="text-xs text-[#8A8A70] mt-0.5">
+                  {students.length === 0 
+                    ? 'Belum ada data. Silakan tarik data dari Google Sheets.' 
+                    : `Menampilkan ${students.length} data siswa`}
+                </p>
               </div>
               
               <div className="flex gap-2">
@@ -1270,6 +1260,7 @@ export default function App() {
                     <button
                       onClick={handleResetDatabase}
                       className="p-1.5 text-rose-700 hover:text-rose-800 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shadow-xs animate-fade-in"
+                      title="Hapus semua data siswa dari aplikasi"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1280,7 +1271,6 @@ export default function App() {
 
             {/* FILTER CONTROLS */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {/* Search input */}
               <div className="relative md:col-span-2">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-[#8A8A70]" />
                 <input
@@ -1295,7 +1285,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Jurusan Filter */}
               <div>
                 <select
                   value={jurusanFilter}
@@ -1316,7 +1305,6 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Status Filter */}
               <div>
                 <select
                   value={statusFilter}
@@ -1333,7 +1321,6 @@ export default function App() {
                 </select>
               </div>
 
-              {/* TOMBOL RESET FILTER */}
               <div>
                 <button
                   onClick={resetAllFilters}
@@ -1348,7 +1335,25 @@ export default function App() {
 
           {/* Table Content */}
           <div className="overflow-x-auto">
-            {filteredStudents.length === 0 ? (
+            {students.length === 0 ? (
+              <div className="text-center py-12 text-[#8A8A70]">
+                <Database className="w-12 h-12 text-[#8A8A70] mx-auto mb-3 opacity-50" />
+                <p className="text-sm font-semibold text-[#33332D]">Belum Ada Data Siswa</p>
+                <p className="text-xs text-[#8A8A70] mt-1">
+                  Silakan masuk sebagai <strong>Developer</strong> dan klik <strong>"Tarik Data dari Sheets"</strong>
+                  <br />untuk mengambil data dari Google Sheets.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowDevPrompt(true);
+                  }}
+                  className="mt-4 bg-[#5A5A40] hover:bg-[#4A4A35] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                >
+                  <Lock className="w-3.5 h-3.5 inline mr-1" />
+                  Buka Developer
+                </button>
+              </div>
+            ) : filteredStudents.length === 0 ? (
               <div className="text-center py-12 text-[#8A8A70]">
                 <AlertCircle className="w-8 h-8 text-[#8A8A70] mx-auto mb-2" />
                 <p className="text-sm font-semibold">Tidak ada siswa yang cocok dengan kriteria pencarian</p>
@@ -1460,44 +1465,46 @@ export default function App() {
           </div>
 
           {/* Pagination */}
-          <div className="p-6 border-t border-[#E0E0D6] bg-[#F5F5F0] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[#8A8A70]">
-            <div className="flex items-center gap-3">
-              <span>Data per halaman:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className="bg-[#F9F9F5] border border-[#D6D6C2] rounded px-2.5 py-1 text-xs text-[#33332D] focus:outline-none"
-              >
-                <option value={10}>10</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={500}>500</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <span>
-                Menampilkan <strong>{Math.min(filteredStudents.length, (currentPage - 1) * pageSize + 1)}</strong> - <strong>{Math.min(filteredStudents.length, currentPage * pageSize)}</strong> dari <strong>{filteredStudents.length}</strong>
-              </span>
-
-              <div className="flex gap-1.5">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => prev - 1)}
-                  className="p-1.5 bg-white border border-[#D6D6C2] hover:bg-[#F5F5F0] rounded-lg text-[#33332D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          {students.length > 0 && (
+            <div className="p-6 border-t border-[#E0E0D6] bg-[#F5F5F0] flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[#8A8A70]">
+              <div className="flex items-center gap-3">
+                <span>Data per halaman:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="bg-[#F9F9F5] border border-[#D6D6C2] rounded px-2.5 py-1 text-xs text-[#33332D] focus:outline-none"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                  className="p-1.5 bg-white border border-[#D6D6C2] hover:bg-[#F5F5F0] rounded-lg text-[#33332D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                  <option value={10}>10</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={500}>500</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span>
+                  Menampilkan <strong>{Math.min(filteredStudents.length, (currentPage - 1) * pageSize + 1)}</strong> - <strong>{Math.min(filteredStudents.length, currentPage * pageSize)}</strong> dari <strong>{filteredStudents.length}</strong>
+                </span>
+
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="p-1.5 bg-white border border-[#D6D6C2] hover:bg-[#F5F5F0] rounded-lg text-[#33332D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="p-1.5 bg-white border border-[#D6D6C2] hover:bg-[#F5F5F0] rounded-lg text-[#33332D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
 
@@ -1683,7 +1690,6 @@ export default function App() {
               </p>
             </div>
 
-            {/* 🔥 PERINGATAN PASSWORD DEFAULT */}
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed">
               <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
               Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
