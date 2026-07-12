@@ -2253,20 +2253,111 @@ function doPost(e) {
       var fileName = payload.fileName || "foto_siswa.jpg";
       var fileType = payload.fileType || "image/jpeg";
       var fileData = payload.fileData || "";
-      var studentNis = payload.studentNis || "";
-      var studentName = payload.studentName || "";
+      var studentNis = String(payload.studentNis || "").trim();
+      var studentName = String(payload.studentName || "").trim();
+      var questionId = String(payload.questionId || "").trim().toLowerCase();
+      var folderId = payload.folderId || "";
       
       try {
         var base64Data = fileData.split(',')[1] || fileData;
-        var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), fileType, fileName);
+        var decodedData = Utilities.base64Decode(base64Data);
+        var blob = Utilities.newBlob(decodedData, fileType, fileName);
         
         var folderName = "FOTO_SISWA";
-        var folders = DriveApp.getFoldersByName(folderName);
-        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        var folder;
+        var folderFound = false;
+        
+        if (folderId) {
+          try {
+            folder = DriveApp.getFolderById(folderId);
+            folderFound = true;
+          } catch (e) {
+            Logger.log("⚠️ Gagal akses folderId: " + e.toString());
+          }
+        }
+        
+        if (!folderFound) {
+          var folders = DriveApp.getFoldersByName(folderName);
+          folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        }
+        
+        // 🔥 Cari file dengan nama yang sama untuk di-replace
+        var existingFiles = folder.getFilesByName(fileName);
+        while (existingFiles.hasNext()) {
+          var existingFile = existingFiles.next();
+          existingFile.setTrashed(true);
+        }
         
         var file = folder.createFile(blob);
+        try {
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (shareErr) {
+          Logger.log("⚠️ Gagal set sharing: " + shareErr.toString());
+        }
+        
         var fileId = file.getId();
         var fileUrl = "https://drive.google.com/uc?export=view&id=" + fileId;
+        
+        // 🔥 UPDATE SPREADSHEET LANGSUNG UNTUK PERTANYAAN INI
+        var sheetMessage = "";
+        if (studentNis && questionId) {
+          var sheet = ss.getSheetByName("Data Siswa") || ss.getSheetByName("data siswa") || ss.getSheetByName("DATA SISWA");
+          if (sheet) {
+            var lastRow = sheet.getLastRow();
+            var lastCol = sheet.getLastColumn();
+            
+            if (lastRow > 1 && lastCol > 0) {
+              var nisRange = sheet.getRange(2, 2, lastRow - 1, 1);
+              var nisValues = nisRange.getValues();
+              var rowNum = -1;
+              for (var r = 0; r < nisValues.length; r++) {
+                if (String(nisValues[r][0]).trim() === studentNis) {
+                  rowNum = r + 2;
+                  break;
+                }
+              }
+              
+              if (rowNum !== -1) {
+                var photoCol = -1;
+                var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+                var targetHeader1 = "q" + questionId.replace("q", "");
+                
+                for (var col = 0; col < headerRow.length; col++) {
+                  var hName = String(headerRow[col]).trim().toLowerCase();
+                  if (hName === targetHeader1 || hName === questionId || hName === "photo_" + questionId) {
+                    photoCol = col + 1;
+                    break;
+                  }
+                }
+                
+                if (photoCol === -1) {
+                  var qNum = questionId.replace("q", "");
+                  if (qNum) {
+                    var targetQHeader = "Q" + qNum;
+                    for (var col = 0; col < headerRow.length; col++) {
+                      if (String(headerRow[col]).trim() === targetQHeader) {
+                        photoCol = col + 1;
+                        break;
+                      }
+                    }
+                  }
+                }
+                
+                if (photoCol !== -1) {
+                  sheet.getRange(rowNum, photoCol).setValue(fileUrl);
+                  sheetMessage = " dan link berhasil dicatat di kolom " + headerRow[photoCol - 1];
+                } else {
+                  photoCol = lastCol + 1;
+                  sheet.getRange(1, photoCol).setValue("PHOTO_" + questionId);
+                  sheet.getRange(rowNum, photoCol).setValue(fileUrl);
+                  sheetMessage = " dan kolom baru PHOTO_" + questionId + " berhasil ditambahkan";
+                }
+                
+                sheet.getRange(rowNum, 6).setValue(new Date().toISOString());
+              }
+            }
+          }
+        }
         
         return ContentService
           .createTextOutput(JSON.stringify({
@@ -2274,7 +2365,7 @@ function doPost(e) {
             fileId: fileId,
             fileUrl: fileUrl,
             fileName: fileName,
-            message: "Foto berhasil diupload ke Google Drive"
+            message: "Foto berhasil diupload ke Google Drive" + sheetMessage
           }))
           .setMimeType(ContentService.MimeType.JSON);
           
@@ -2625,20 +2716,111 @@ function doPost(e) {
       var fileName = payload.fileName || "foto_siswa.jpg";
       var fileType = payload.fileType || "image/jpeg";
       var fileData = payload.fileData || "";
-      var studentNis = payload.studentNis || "";
-      var studentName = payload.studentName || "";
+      var studentNis = String(payload.studentNis || "").trim();
+      var studentName = String(payload.studentName || "").trim();
+      var questionId = String(payload.questionId || "").trim().toLowerCase();
+      var folderId = payload.folderId || "";
       
       try {
         var base64Data = fileData.split(',')[1] || fileData;
-        var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), fileType, fileName);
+        var decodedData = Utilities.base64Decode(base64Data);
+        var blob = Utilities.newBlob(decodedData, fileType, fileName);
         
         var folderName = "FOTO_SISWA";
-        var folders = DriveApp.getFoldersByName(folderName);
-        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        var folder;
+        var folderFound = false;
+        
+        if (folderId) {
+          try {
+            folder = DriveApp.getFolderById(folderId);
+            folderFound = true;
+          } catch (e) {
+            Logger.log("⚠️ Gagal akses folderId: " + e.toString());
+          }
+        }
+        
+        if (!folderFound) {
+          var folders = DriveApp.getFoldersByName(folderName);
+          folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        }
+        
+        // 🔥 Cari file dengan nama yang sama untuk di-replace
+        var existingFiles = folder.getFilesByName(fileName);
+        while (existingFiles.hasNext()) {
+          var existingFile = existingFiles.next();
+          existingFile.setTrashed(true);
+        }
         
         var file = folder.createFile(blob);
+        try {
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (shareErr) {
+          Logger.log("⚠️ Gagal set sharing: " + shareErr.toString());
+        }
+        
         var fileId = file.getId();
         var fileUrl = "https://drive.google.com/uc?export=view&id=" + fileId;
+        
+        // 🔥 UPDATE SPREADSHEET LANGSUNG UNTUK PERTANYAAN INI
+        var sheetMessage = "";
+        if (studentNis && questionId) {
+          var sheet = ss.getSheetByName("Data Siswa") || ss.getSheetByName("data siswa") || ss.getSheetByName("DATA SISWA");
+          if (sheet) {
+            var lastRow = sheet.getLastRow();
+            var lastCol = sheet.getLastColumn();
+            
+            if (lastRow > 1 && lastCol > 0) {
+              var nisRange = sheet.getRange(2, 2, lastRow - 1, 1);
+              var nisValues = nisRange.getValues();
+              var rowNum = -1;
+              for (var r = 0; r < nisValues.length; r++) {
+                if (String(nisValues[r][0]).trim() === studentNis) {
+                  rowNum = r + 2;
+                  break;
+                }
+              }
+              
+              if (rowNum !== -1) {
+                var photoCol = -1;
+                var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+                var targetHeader1 = "q" + questionId.replace("q", "");
+                
+                for (var col = 0; col < headerRow.length; col++) {
+                  var hName = String(headerRow[col]).trim().toLowerCase();
+                  if (hName === targetHeader1 || hName === questionId || hName === "photo_" + questionId) {
+                    photoCol = col + 1;
+                    break;
+                  }
+                }
+                
+                if (photoCol === -1) {
+                  var qNum = questionId.replace("q", "");
+                  if (qNum) {
+                    var targetQHeader = "Q" + qNum;
+                    for (var col = 0; col < headerRow.length; col++) {
+                      if (String(headerRow[col]).trim() === targetQHeader) {
+                        photoCol = col + 1;
+                        break;
+                      }
+                    }
+                  }
+                }
+                
+                if (photoCol !== -1) {
+                  sheet.getRange(rowNum, photoCol).setValue(fileUrl);
+                  sheetMessage = " dan link berhasil dicatat di kolom " + headerRow[photoCol - 1];
+                } else {
+                  photoCol = lastCol + 1;
+                  sheet.getRange(1, photoCol).setValue("PHOTO_" + questionId);
+                  sheet.getRange(rowNum, photoCol).setValue(fileUrl);
+                  sheetMessage = " dan kolom baru PHOTO_" + questionId + " berhasil ditambahkan";
+                }
+                
+                sheet.getRange(rowNum, 6).setValue(new Date().toISOString());
+              }
+            }
+          }
+        }
         
         return ContentService
           .createTextOutput(JSON.stringify({
@@ -2646,7 +2828,7 @@ function doPost(e) {
             fileId: fileId,
             fileUrl: fileUrl,
             fileName: fileName,
-            message: "Foto berhasil diupload ke Google Drive"
+            message: "Foto berhasil diupload ke Google Drive" + sheetMessage
           }))
           .setMimeType(ContentService.MimeType.JSON);
           

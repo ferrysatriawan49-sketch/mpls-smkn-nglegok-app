@@ -38,7 +38,9 @@ const IYA_BELUM = [
   { value: 'belum', label: 'Belum' }
 ];
 
-// Define first 70 questions
+// ============================================================
+// 🔥 QUESTIONS 1-70 (Q69 dan Q70 DIHAPUS)
+// ============================================================
 const QUESTIONS_1_TO_70: Question[] = [
   { id: 'q1', number: 1, text: 'Nama Lengkap (Sesuai Data Pendaftaran)', type: 'text', required: true },
   { id: 'q2', number: 2, text: 'NIS (Nomor Induk Siswa)', type: 'text', required: true },
@@ -53,7 +55,6 @@ const QUESTIONS_1_TO_70: Question[] = [
   },
   { id: 'q4', number: 4, text: 'Tempat Lahir', type: 'text', required: true, minLength: 2, placeholder: 'Nama Kota/Kabupaten' },
   { id: 'q5', number: 5, text: 'Tanggal Lahir', type: 'date', required: true, validationMessage: 'Format tanggal harus dd-mm-yyyy' },
-  // 🔥 Q6: Foto Selfie - DIPERBAIKI
   { 
     id: 'q6', 
     number: 6, 
@@ -73,7 +74,6 @@ const QUESTIONS_1_TO_70: Question[] = [
     maxLength: 100,
     placeholder: 'Tulis alamat lengkap minimal 35 karakter dan maksimal 100 karakter'
   },
-  // 🔥 Q9: Foto Rumah - DIPERBAIKI
   { 
     id: 'q9', 
     number: 9, 
@@ -157,7 +157,7 @@ const QUESTIONS_1_TO_70: Question[] = [
   { id: 'q23', number: 23, text: 'Pekerjaan Ibu', type: 'text', required: true, minLength: 2, maxLength: 60 },
   { id: 'q24', number: 24, text: 'Penghasilan Rata-rata Ibu per Bulan', type: 'select', required: true, options: PENGHASILAN_OPTIONS },
   { 
-    id: 'q19_ibu', // Remapped question 25 to separate from Ayah
+    id: 'q19_ibu',
     number: 25, 
     text: 'Nomor Telepon (WhatsApp) Ibu (Awalan 62)', 
     type: 'text', 
@@ -204,7 +204,6 @@ const QUESTIONS_1_TO_70: Question[] = [
       { value: 'Ayah / Ibu Tidak Tinggal Bersama Karena Salah Satu / Keduanya Sudah Meninggal', label: 'Ayah / Ibu Tidak Tinggal Bersama Karena Salah Satu / Keduanya Sudah Meninggal' }
     ]
   },
-  // 🔥 Q29: Foto Bersama Keluarga - DIPERBAIKI
   { 
     id: 'q29', 
     number: 29, 
@@ -238,7 +237,7 @@ const QUESTIONS_1_TO_70: Question[] = [
       { value: 'Diri Sendiri', label: 'Diri Sendiri' }
     ]
   },
-  // Wali fields (Q32 - Q36) are conditional on Q31 !== Orang Tua Siswa
+  // Wali fields (Q32 - Q36) conditional on Q31 !== Orang Tua Siswa
   { 
     id: 'q32', 
     number: 32, 
@@ -266,12 +265,11 @@ const QUESTIONS_1_TO_70: Question[] = [
   { 
     id: 'q34', 
     number: 34, 
-    text: 'Alamat Rumah Wali', 
+    text: 'Konflik pribadi yang sedang Anda hadapi (max 50 karakter)', 
     type: 'text', 
     required: false,
-    minLength: 35,
-    maxLength: 100,
-    placeholder: 'Alamat rumah wali minimal 35 dan maksimal 100 karakter',
+    maxLength: 50,
+    placeholder: 'Tuliskan secara singkat...',
     dependsOn: { questionId: 'q31', value: 'Orang Tua Siswa (Ayah / Ibu Kandung)', condition: 'not_equals' }
   },
   { 
@@ -463,7 +461,7 @@ const QUESTIONS_1_TO_70: Question[] = [
   },
   { 
     id: 'q52_2', 
-    number: 52, // Repeated number in prompt
+    number: 52,
     text: 'Apa yang memotivasi Anda untuk meraih prestasi? (Pilih maksimal 2)', 
     type: 'multiselect', 
     required: true,
@@ -594,12 +592,13 @@ const QUESTIONS_1_TO_70: Question[] = [
   },
   { id: 'q66', number: 66, text: 'Apakah Anda berminat mengikuti O2SN (Olimpiade Olahraga Siswa Nasional)?', type: 'select', required: true, options: [{ value: 'Iya', label: 'Iya' }, { value: 'Tidak', label: 'Tidak' }] },
   { id: 'q67', number: 67, text: 'Apakah Anda berminat mengikuti FLS3N (Festival Lomba Seni dan Sastra Siswa Nasional)?', type: 'select', required: true, options: [{ value: 'Iya', label: 'Iya' }, { value: 'Tidak', label: 'Tidak' }] },
-  { id: 'q68', number: 68, text: 'Titik Koordinat Rumah Anda (GPS)', type: 'location', required: true },
-  { id: 'q69', number: 69, text: 'File Foto Rumah (jpg, jpeg, png, 100 kb - 500 kb)', type: 'file', required: true },
-  { id: 'q70', number: 70, text: 'File Foto Bersama Keluarga (jpg, jpeg, png, 100 kb - 500 kb)', type: 'file', required: true }
+  { id: 'q68', number: 68, text: 'Titik Koordinat Rumah Anda (GPS)', type: 'location', required: true }
+  // 🔥 Q69 dan Q70 DIHAPUS
 ];
 
-// Define remaining self-reflection statements and career readiness
+// ============================================================
+// SELF REFLECTION QUESTIONS (Q71 - Q87)
+// ============================================================
 const SELF_REFLECTION_QUESTIONS: { id: string; text: string; num: number }[] = [
   { id: 'q71', num: 71, text: 'Saya merasa disiplin dalam beribadah pada Tuhan YME' },
   { id: 'q72', num: 72, text: 'Saya kadang-kadang berperilaku dan bertutur kata tidak jujur' },
@@ -620,6 +619,9 @@ const SELF_REFLECTION_QUESTIONS: { id: string; text: string; num: number }[] = [
   { id: 'q87', num: 87, text: 'Saya mempunyai masalah dengan anggota keluarga di rumah' }
 ];
 
+// ============================================================
+// Q88 - HUBUNGAN DENGAN WALI
+// ============================================================
 const HUBUNGAN_WALI_Q: Question = {
   id: 'q88',
   number: 88,
@@ -635,11 +637,14 @@ const HUBUNGAN_WALI_Q: Question = {
   ]
 };
 
+// ============================================================
+// FAMILY AND SCHOOL LIFE QUESTIONS (Q95 - Q128)
+// ============================================================
 const FAMILY_AND_SCHOOL_LIFE_QUESTIONS: { id: string; text: string; num: number }[] = [
   { id: 'q95', num: 95, text: 'Orang tua saya peduli dengan perkembangan belajar saya' },
   { id: 'q96', num: 96, text: 'Saya selalu berkomunikasi akrab dengan orang tua' },
   { id: 'q97', num: 97, text: 'Saya bisa menjadi pribadi yang mandiri' },
-  // 🔥 Q98: Konflik Pribadi - DIPERBAIKI
+  // 🔥 Q98 DIPERBAIKI - max 50 karakter
   { 
     id: 'q98', 
     num: 98, 
@@ -677,6 +682,9 @@ const FAMILY_AND_SCHOOL_LIFE_QUESTIONS: { id: string; text: string; num: number 
   { id: 'q128', num: 128, text: 'Saya merasa paham hubungan antara hobi, bakat, minat, kemampuan dan karir' }
 ];
 
+// ============================================================
+// PLANNING AND PROBLEMS QUESTIONS (Q129 - Q133)
+// ============================================================
 const PLANNING_AND_PROBLEMS_QUESTIONS: Question[] = [
   { id: 'q129', number: 129, text: 'Saya memiliki perencanaan karir masa depan', type: 'select', required: true, options: IYA_BELUM },
   { id: 'q130', number: 130, text: 'Tuliskan masalah pribadi apa yang sedang dialami (maksimal 50 karakter)', type: 'text', required: true, maxLength: 50, placeholder: 'Contoh: Sulit berkonsentrasi saat ramai, dsb.' },
@@ -685,6 +693,9 @@ const PLANNING_AND_PROBLEMS_QUESTIONS: Question[] = [
   { id: 'q133', number: 133, text: 'Tuliskan masalah karir apa yang sedang dialami (maksimal 50 karakter)', type: 'text', required: true, maxLength: 50, placeholder: 'Contoh: Belum mantap memilih universitas.' }
 ];
 
+// ============================================================
+// MATERIAL COMPREHENSION QUESTIONS (Q134 - Q141)
+// ============================================================
 const MATERIAL_COMPREHENSION_QUESTIONS: { id: string; text: string; num: number }[] = [
   { id: 'q134', num: 134, text: 'Saya memahami materi stop perundungan (bullying)' },
   { id: 'q135', num: 135, text: 'Saya memahami materi brain root / pornografi' },
@@ -696,6 +707,9 @@ const MATERIAL_COMPREHENSION_QUESTIONS: { id: string; text: string; num: number 
   { id: 'q141', num: 141, text: 'Saya sudah memahami bahwa saya harus menjaga aset sekolah untuk digunakan sesuai dengan aturan yang berlaku' }
 ];
 
+// ============================================================
+// GOAL AND SOFT SKILL QUESTIONS (Q142 - Q156)
+// ============================================================
 const GOAL_AND_SOFT_SKILL_QUESTIONS: { id: string; text: string; num: number }[] = [
   { id: 'q142', num: 142, text: 'Saya sudah memiliki cita-cita atau tujuan yang ingin saya capai di masa depan.' },
   { id: 'q143', num: 143, text: 'Saya mengetahui alasan memilih program keahlian/jurusan yang saya pelajari saat ini.' },
@@ -714,11 +728,14 @@ const GOAL_AND_SOFT_SKILL_QUESTIONS: { id: string; text: string; num: number }[]
   { id: 'q156', num: 156, text: 'Saya memiliki rencana yang ingin dicapai selama belajar di SMK.' }
 ];
 
+// ============================================================
+// FUTURE PLAN QUESTIONS (Q157 - Q166)
+// ============================================================
 const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q157',
     number: 157,
-    text: 'Alasan utama saya memilih program keahlian/jurusan ini adalah ….',
+    text: 'Alasan utama saya memilih program keahlian/jurusan ini adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     hasOther: true,
@@ -733,7 +750,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q158',
     number: 158,
-    text: 'Setelah lulus SMK, saya berencana untuk ….',
+    text: 'Setelah lulus SMK, saya berencana untuk …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -747,7 +764,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q159',
     number: 159,
-    text: 'Pekerjaan atau profesi yang paling saya minati saat ini adalah ….',
+    text: 'Pekerjaan atau profesi yang paling saya minati saat ini adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -761,7 +778,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q160',
     number: 160,
-    text: 'Hal yang paling ingin saya pelajari selama bersekolah di SMK adalah ….',
+    text: 'Hal yang paling ingin saya pelajari selama bersekolah di SMK adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -775,7 +792,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q161',
     number: 161,
-    text: 'Kemampuan yang paling ingin saya miliki setelah lulus SMK adalah ….',
+    text: 'Kemampuan yang paling ingin saya miliki setelah lulus SMK adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -789,7 +806,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q162',
     number: 162,
-    text: 'Kegiatan yang paling ingin saya ikuti untuk mengembangkan diri selama di SMK adalah ….',
+    text: 'Kegiatan yang paling ingin saya ikuti untuk mengembangkan diri selama di SMK adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -803,7 +820,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q163',
     number: 163,
-    text: 'Menurut saya, hal yang paling penting untuk mencapai cita-cita adalah ….',
+    text: 'Menurut saya, hal yang paling penting untuk mencapai cita-cita adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -817,7 +834,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q164',
     number: 164,
-    text: 'Harapan terbesar saya setelah belajar di SMK ini adalah ….',
+    text: 'Harapan terbesar saya setelah belajar di SMK ini adalah …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -845,7 +862,7 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   {
     id: 'q166',
     number: 166,
-    text: 'Informasi tentang karier atau pekerjaan paling sering saya peroleh dari ….',
+    text: 'Informasi tentang karier atau pekerjaan paling sering saya peroleh dari …. (Pilih 1)',
     type: 'select',
     required: true,
     options: [
@@ -858,11 +875,13 @@ const FUTURE_PLAN_QUESTIONS: Question[] = [
   }
 ];
 
-// Helper to compile final categorized group
+// ============================================================
+// FUNGSI getQuestionsList - Menggabungkan semua pertanyaan
+// ============================================================
 export const getQuestionsList = (): Question[] => {
   const result: Question[] = [];
 
-  // 1. Add questions 1 to 70
+  // 1. Add questions 1 to 68 (Q69 dan Q70 dihapus)
   result.push(...QUESTIONS_1_TO_70);
 
   // 2. Add self reflections (71 - 87)
@@ -922,6 +941,9 @@ export const getQuestionsList = (): Question[] => {
   return result.sort((a, b) => a.number - b.number);
 };
 
+// ============================================================
+// QUESTION_GROUPS - Pengelompokan berdasarkan kategori
+// ============================================================
 export const QUESTION_GROUPS: QuestionGroup[] = [
   {
     id: 'basic',
@@ -956,7 +978,7 @@ export const QUESTION_GROUPS: QuestionGroup[] = [
     title: 'Sekolah Asal & Adaptasi',
     icon: 'GraduationCap',
     description: 'Asal sekolah SMP/MTs, kebiasaan belajar, jarak rumah, transportasi, dan koordinat GPS rumah tinggal.',
-    questions: getQuestionsList().filter(q => (q.number >= 55 && q.number <= 65) || (q.number >= 68 && q.number <= 70))
+    questions: getQuestionsList().filter(q => (q.number >= 55 && q.number <= 65) || q.number === 68)
   },
   {
     id: 'career_future',
