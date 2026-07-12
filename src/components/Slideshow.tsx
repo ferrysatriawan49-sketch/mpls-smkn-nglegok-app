@@ -2,10 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+// @ts-ignore
+import slide1 from '../assets/images/slide_mpls_1_2026_1783871138970.jpg';
+// @ts-ignore
+import slide2 from '../assets/images/slide_mpls_2_1783870650293.jpg';
+// @ts-ignore
+import slide3 from '../assets/images/slide_mpls_3_1783870666127.jpg';
+
 const SLIDES = [
   {
     id: 1,
-    url: '/src/assets/images/slide_mpls_1_2026_1783871138970.jpg',
+    url: slide1,
     title: 'Masa Pengenalan Lingkungan Sekolah yang Ramah',
     subtitle: 'Membentuk Karakter Unggul & Berakhlak Mulia',
     badge: 'MPLS Ramah 2026',
@@ -13,7 +20,7 @@ const SLIDES = [
   },
   {
     id: 2,
-    url: '/src/assets/images/slide_mpls_2_1783870650293.jpg',
+    url: slide2,
     title: 'Disiplin, Berprestasi, Bebas Bullying & Narkoba',
     subtitle: 'Menciptakan Sekolah yang Aman, Nyaman, dan Inklusif',
     badge: 'Karakter Positif',
@@ -21,7 +28,7 @@ const SLIDES = [
   },
   {
     id: 3,
-    url: '/src/assets/images/slide_mpls_3_1783870666127.jpg',
+    url: slide3,
     title: 'Ayo Kembali ke Sekolah dengan Semangat Baru!',
     subtitle: 'Tahun Ajaran Baru 2026/2027 - Raih Cita-Cita Bersama',
     badge: 'Tahun Ajaran Baru',
