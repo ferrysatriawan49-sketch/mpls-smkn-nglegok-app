@@ -3,6 +3,7 @@ import { Student } from './types';
 import { getQuestionsList } from './questionsData';
 import { exportToCSV, calculateProgressPercent } from './utils';
 import StudentForm from './components/StudentForm';
+import { Slideshow } from './components/Slideshow';
 // @ts-ignore
 import logoImg from './assets/smknglegok_logo.png';
 import { logoBase64 } from './assets/logoBase64';
@@ -992,7 +993,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
     return (
       <div className="min-h-screen bg-[#FDFCF8] flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5A5A40] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0C2B64] mx-auto"></div>
           <p className="text-sm text-[#8A8A70]">Memuat data dari Google Sheets...</p>
         </div>
       </div>
@@ -1019,7 +1020,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
   return (
     <div className="min-h-screen bg-[#FDFCF8] text-[#33332D] font-sans antialiased">
       {/* HEADER */}
-      <header className="relative overflow-hidden bg-[#5A5A40] text-white border-b border-[#4A4A35] shadow-sm">
+      <header className="relative overflow-hidden bg-[#0C2B64] text-white border-b-4 border-[#D4AF37] shadow-md">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-40"></div>
         
         <div className="max-w-7xl mx-auto px-4 py-8 relative z-10">
@@ -1101,7 +1102,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </h1>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#E5E5D8]">
                 <span className="flex items-center gap-1.5 font-semibold text-[#FDFCF8]">
-                  <span className="w-2 h-2 rounded-full bg-[#D6D6C2]"></span>
+                  <span className="w-2 h-2 rounded-full bg-[#D4AF37]"></span>
                   SMK Negeri 1 Nglegok Blitar
                 </span>
                 <span>&bull;</span>
@@ -1124,13 +1125,16 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         
+        {/* HERO SLIDESHOW */}
+        <Slideshow />
+        
         {/* STATS */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-white border border-[#D6D6C2] rounded-2xl p-6 flex flex-col justify-between hover:border-[#8A8A70] hover:shadow-md transition-all duration-300 shadow-xs">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-xs font-bold text-[#8A8A70] tracking-wider uppercase font-mono">Siswa Baru Terdaftar</span>
-                <span className="bg-[#F5F5F0] text-[#5A5A40] border border-[#D6D6C2] px-2 py-0.5 rounded text-[10px] font-bold">Roster Aktif</span>
+                <span className="bg-[#F5F5F0] text-[#0C2B64] border border-[#D6D6C2] px-2 py-0.5 rounded text-[10px] font-bold">Roster Aktif</span>
               </div>
               <div>
                 <p className="text-4xl font-serif font-extrabold text-[#33332D] tracking-tight">{totalStudentsCount}</p>
@@ -1138,7 +1142,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </div>
               <div className="border-t border-[#F0F0E6] mt-4 pt-3 flex items-center justify-between text-[11px] text-[#8A8A70]">
                 <span>Daftar pendaftaran dibuka</span>
-                <span className="text-[#5A5A40] font-semibold">Tutup 20 Juli 2026</span>
+                <span className="text-[#0C2B64] font-semibold">Tutup 20 Juli 2026</span>
               </div>
             </div>
 
@@ -1211,7 +1215,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-2xl font-serif font-black text-[#33332D]">{completedPercent}%</span>
-                    <span className="text-[9px] font-bold text-[#5A5A40] uppercase tracking-widest font-mono">SELESAI</span>
+                    <span className="text-[9px] font-bold text-[#0C2B64] uppercase tracking-widest font-mono">SELESAI</span>
                   </div>
                 </div>
               )}
@@ -1239,8 +1243,8 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
           <div className="bg-white border border-[#D6D6C2] rounded-2xl p-6 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-5 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#5A5A40] font-bold text-sm">
-                  <FileSpreadsheet className="w-5 h-5 text-[#5A5A40]" />
+                <div className="flex items-center gap-2 text-[#0C2B64] font-bold text-sm">
+                  <FileSpreadsheet className="w-5 h-5 text-[#0C2B64]" />
                   <span>Modul Integrasi Google Sheets</span>
                 </div>
                 <button
@@ -1256,7 +1260,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </p>
 
               <div className="space-y-1.5 bg-[#FDFCF8] p-3 rounded-xl border border-[#D6D6C2]/60">
-                <label className="block text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                   URL Web App Google Apps Script:
                 </label>
                 <div className="flex gap-2">
@@ -1265,14 +1269,14 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     value={googleSheetsUrlInput}
                     onChange={(e) => setGoogleSheetsUrlInput(e.target.value)}
                     placeholder="https://script.google.com/macros/s/.../exec"
-                    className="flex-1 min-w-0 bg-white border border-[#D6D6C2] rounded-lg px-3 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40] font-mono"
+                    className="flex-1 min-w-0 bg-white border border-[#D6D6C2] rounded-lg px-3 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] font-mono"
                   />
                   <button
                     onClick={() => handleSaveSheetsUrl()}
                     className={`shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition-all cursor-pointer shadow-xs ${
                       urlSavedSuccess 
                         ? 'bg-emerald-600 hover:bg-emerald-700' 
-                        : 'bg-[#5A5A40] hover:bg-[#4A4A35]'
+                        : 'bg-[#0C2B64] hover:bg-[#081F48]'
                     }`}
                   >
                     {urlSavedSuccess ? 'Tersimpan ✓' : 'Simpan URL'}
@@ -1285,10 +1289,10 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 <button
                   type="button"
                   onClick={() => setShowChangeCredsForm(!showChangeCredsForm)}
-                  className="w-full px-3 py-2.5 text-xs font-bold text-[#5A5A40] hover:text-[#33332D] flex items-center justify-between transition-colors bg-[#F5F5F0]/50 cursor-pointer"
+                  className="w-full px-3 py-2.5 text-xs font-bold text-[#0C2B64] hover:text-[#33332D] flex items-center justify-between transition-colors bg-[#F5F5F0]/50 cursor-pointer"
                 >
                   <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-[#5A5A40]" />
+                    <ShieldCheck className="w-4 h-4 text-[#0C2B64]" />
                     Pengaturan Kredensial Developer
                   </span>
                   <span className="text-[10px] bg-white border border-[#D6D6C2] px-1.5 py-0.5 rounded text-[#8A8A70]">
@@ -1314,7 +1318,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                        <label className="block text-[9px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                           Email Lama:
                         </label>
                         <input
@@ -1322,11 +1326,11 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                           value={devCurrentEmail}
                           onChange={(e) => setDevCurrentEmail(e.target.value)}
                           placeholder="admin@smk.id"
-                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                        <label className="block text-[9px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                           Password Lama:
                         </label>
                         <input
@@ -1334,14 +1338,14 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                           value={devCurrentPassword}
                           onChange={(e) => setDevCurrentPassword(e.target.value)}
                           placeholder="••••••"
-                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                        <label className="block text-[9px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                           Email Baru:
                         </label>
                         <input
@@ -1349,11 +1353,11 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                           value={devNewEmail}
                           onChange={(e) => setDevNewEmail(e.target.value)}
                           placeholder="email.baru@smk.id"
-                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="block text-[9px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                        <label className="block text-[9px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                           Password Baru:
                         </label>
                         <input
@@ -1361,7 +1365,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                           value={devNewPassword}
                           onChange={(e) => setDevNewPassword(e.target.value)}
                           placeholder="Min. 6 karakter"
-                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                          className="w-full bg-white border border-[#D6D6C2] rounded-lg px-2.5 py-1.5 text-[11px] text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                         />
                       </div>
                     </div>
@@ -1388,7 +1392,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     <button
                       type="submit"
                       disabled={isUpdatingDevCreds}
-                      className="w-full bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                      className="w-full bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                     >
                       {isUpdatingDevCreds ? (
                         <>
@@ -1407,7 +1411,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 <button
                   onClick={handleSyncSheets}
                   disabled={isSyncing || students.length === 0}
-                  className="flex items-center gap-1.5 bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#E5E5D8] text-white disabled:text-[#8A8A70] px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                  className="flex items-center gap-1.5 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#E5E5D8] text-white disabled:text-[#8A8A70] px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                   {isSyncing ? 'Sinkronisasi...' : 'Sinkronkan Google Sheets'}
@@ -1432,23 +1436,23 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 </button>
                 <button
                   onClick={() => setShowCodeModal(true)}
-                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs"
+                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs"
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-[#5A5A40]" />
+                  <ExternalLink className="w-3.5 h-3.5 text-[#0C2B64]" />
                   Kode Apps Script
                 </button>
                 <button
                   onClick={() => exportToCSV(students)}
                   disabled={students.length === 0}
-                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5 text-[#5A5A40]" />
+                  <Download className="w-3.5 h-3.5 text-[#0C2B64]" />
                   Unduh CSV
                 </button>
               </div>
             </div>
 
-            <div className="lg:col-span-7 bg-[#F5F5F0] border border-[#D6D6C2] rounded-xl p-4 h-44 overflow-y-auto font-mono text-[10px] text-[#5A5A40] space-y-1 scrollbar-thin">
+            <div className="lg:col-span-7 bg-[#F5F5F0] border border-[#D6D6C2] rounded-xl p-4 h-44 overflow-y-auto font-mono text-[10px] text-[#0C2B64] space-y-1 scrollbar-thin">
               <div className="flex items-center justify-between border-b border-[#D6D6C2] pb-1.5 mb-2 text-[#8A8A70] font-sans">
                 <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5" /> Konsol Sinkronisasi</span>
                 <span className={isAutoSyncing ? 'text-amber-600 font-bold' : autoSyncStatus === 'success' ? 'text-emerald-600 font-bold' : autoSyncStatus === 'error' ? 'text-rose-600 font-bold' : ''}>
@@ -1498,7 +1502,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                       setDevPasswordError('');
                       setShowDevPrompt(true);
                     }}
-                    className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-1.5 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs"
+                    className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-1.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs"
                   >
                     <Lock className="w-3.5 h-3.5 text-[#8A8A70]" />
                     Buka Developer
@@ -1508,7 +1512,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   <>
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-1.5 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs animate-fade-in"
+                      className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-1.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs animate-fade-in"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
                       Tambah Siswa
@@ -1537,7 +1541,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg pl-9 pr-4 py-2 text-xs text-[#33332D] placeholder-[#8A8A70] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg pl-9 pr-4 py-2 text-xs text-[#33332D] placeholder-[#8A8A70] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 />
               </div>
 
@@ -1548,7 +1552,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setJurusanFilter(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 >
                   <option value="All">Semua Program Keahlian</option>
                   <option value="TKR">TKR</option>
@@ -1568,7 +1572,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setStatusFilter(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 >
                   <option value="All">Semua Status</option>
                   <option value="completed">Sudah Selesai</option>
@@ -1580,7 +1584,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               <div>
                 <button
                   onClick={resetAllFilters}
-                  className="w-full bg-[#F5F5F0] hover:bg-[#E5E5D8] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                  className="w-full bg-[#F5F5F0] hover:bg-[#E5E5D8] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Reset Filter
@@ -1603,7 +1607,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   onClick={() => {
                     setShowDevPrompt(true);
                   }}
-                  className="mt-4 bg-[#5A5A40] hover:bg-[#4A4A35] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                  className="mt-4 bg-[#0C2B64] hover:bg-[#081F48] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   <Lock className="w-3.5 h-3.5 inline mr-1" />
                   Buka Developer
@@ -1662,12 +1666,12 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                         onClick={() => setLoginStudent(student)}
                       >
                         <td className="py-4 px-6 text-[#8A8A70] font-mono font-semibold">{rowNum}</td>
-                        {isDevUnlocked && <td className="py-4 px-6 font-mono font-bold text-[#5A5A40]">{student.nis}</td>}
-                        <td className="py-4 px-6 font-bold text-[#33332D] group-hover:text-[#5A5A40] transition-colors">
+                        {isDevUnlocked && <td className="py-4 px-6 font-mono font-bold text-[#0C2B64]">{student.nis}</td>}
+                        <td className="py-4 px-6 font-bold text-[#33332D] group-hover:text-[#0C2B64] transition-colors">
                           {student.name}
                         </td>
                         <td className="py-4 px-6">
-                          <span className="bg-[#F5F5F0] text-[#5A5A40] border border-[#D6D6C2] px-2.5 py-1 rounded font-semibold text-[10px]">
+                          <span className="bg-[#F5F5F0] text-[#0C2B64] border border-[#D6D6C2] px-2.5 py-1 rounded font-semibold text-[10px]">
                             {student.answers.q11 || 'Belum Dipilih'}
                           </span>
                         </td>
@@ -1698,7 +1702,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                         <td className="py-4 px-6 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setLoginStudent(student)}
-                            className="inline-flex items-center gap-1 bg-[#5A5A40] hover:bg-[#4A4A35] text-white px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-xs"
+                            className="inline-flex items-center gap-1 bg-[#0C2B64] hover:bg-[#081F48] text-white px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-xs"
                           >
                             <LogIn className="w-3.5 h-3.5" />
                             Isi
@@ -1776,13 +1780,13 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
       {loginStudent && (
         <div className="fixed inset-0 z-50 bg-[#33332D]/60 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl animate-fade-in relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#5A5A40]/5 rounded-full blur-2xl"></div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#0C2B64]/5 rounded-full blur-2xl"></div>
 
             <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-[#F5F5F0] border border-[#D6D6C2] flex items-center justify-center text-[#5A5A40] mx-auto mb-3">
+              <div className="w-12 h-12 rounded-full bg-[#F5F5F0] border border-[#D6D6C2] flex items-center justify-center text-[#0C2B64] mx-auto mb-3">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <span className="text-[10px] font-bold text-[#5A5A40] tracking-widest uppercase font-mono">Verifikasi Akses</span>
+              <span className="text-[10px] font-bold text-[#0C2B64] tracking-widest uppercase font-mono">Verifikasi Akses</span>
               <h3 className="text-lg font-black text-[#33332D] tracking-tight">Login Portal Siswa</h3>
               <p className="text-xs text-[#8A8A70]">Masukkan NIS Anda untuk verifikasi identitas.</p>
             </div>
@@ -1790,7 +1794,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
             <div className="bg-[#F5F5F0] rounded-xl p-4 border border-[#E0E0D6] space-y-1">
               <p className="text-[10px] font-bold text-[#8A8A70] uppercase tracking-wide">Biodata</p>
               <p className="text-sm font-extrabold text-[#33332D] leading-snug">{loginStudent.name}</p>
-              <div className="flex items-center gap-3 text-[11px] text-[#5A5A40] mt-1">
+              <div className="flex items-center gap-3 text-[11px] text-[#0C2B64] mt-1">
                 <span>Jurusan: {loginStudent.answers.q11 || 'Belum Dipilih'}</span>
               </div>
             </div>
@@ -1807,7 +1811,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setNisPassword(e.target.value);
                     setLoginError(null);
                   }}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 />
                 {loginError && (
                   <div className="flex items-center gap-1 text-xs text-red-600 font-semibold mt-1">
@@ -1825,13 +1829,13 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setNisPassword('');
                     setLoginError(null);
                   }}
-                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer text-center shadow-xs"
+                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-[#5A5A40] hover:bg-[#4A4A35] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center"
+                  className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center"
                 >
                   Masuk & Isi
                 </button>
@@ -1859,7 +1863,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   placeholder="AHMAD ADI WIJAYA"
                   value={newStudentName}
                   onChange={(e) => setNewStudentName(e.target.value.toUpperCase())}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 />
               </div>
 
@@ -1871,7 +1875,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   placeholder="20261020"
                   value={newStudentNis}
                   onChange={(e) => setNewStudentNis(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 />
               </div>
 
@@ -1880,7 +1884,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 <select
                   value={newStudentJurusan}
                   onChange={(e) => setNewStudentJurusan(e.target.value)}
-                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  className="w-full bg-[#F9F9F5] border border-[#D6D6C2] rounded-lg px-3 py-2 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64]"
                 >
                   <option value="TKR">TKR</option>
                   <option value="TSM">TSM</option>
@@ -1900,13 +1904,13 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setNewStudentName('');
                     setNewStudentNis('');
                   }}
-                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer text-center shadow-xs"
+                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-[#5A5A40] hover:bg-[#4A4A35] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center"
+                  className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center"
                 >
                   Simpan
                 </button>
@@ -1933,7 +1937,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
             </button>
 
             <div className="space-y-1 text-center">
-              <div className="mx-auto w-12 h-12 rounded-full bg-[#FDFCF8] text-[#5A5A40] flex items-center justify-center mb-2 border border-[#D6D6C2]">
+              <div className="mx-auto w-12 h-12 rounded-full bg-[#FDFCF8] text-[#0C2B64] flex items-center justify-center mb-2 border border-[#D6D6C2]">
                 <Lock className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-serif font-black text-[#33332D] tracking-tight">
@@ -1951,7 +1955,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
 
             <form onSubmit={handleDevUnlockSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                   Email Developer:
                 </label>
                 <input
@@ -1961,12 +1965,12 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   placeholder="Masukkan email dari sheet developer"
                   disabled={isVerifyingDev}
                   autoFocus
-                  className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40] disabled:opacity-60"
+                  className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider font-mono">
+                <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                   Password Developer:
                 </label>
                 <input
@@ -1975,7 +1979,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   onChange={(e) => setInputDevPassword(e.target.value)}
                   placeholder="Masukkan password dari sheet developer"
                   disabled={isVerifyingDev}
-                  className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#5A5A40] disabled:opacity-60"
+                  className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
                 />
                 {devPasswordError && (
                   <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
@@ -1985,7 +1989,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 )}
               </div>
 
-              <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-3 text-[11px] text-[#5A5A40] leading-relaxed">
+              <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-3 text-[11px] text-[#0C2B64] leading-relaxed">
                 <strong>🔒 Informasi:</strong> Hanya data di sheet <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developer</code> yang berlaku.
               </div>
 
@@ -1998,14 +2002,14 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setDevPasswordError('');
                   }}
                   disabled={isVerifyingDev}
-                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#5A5A40] transition-colors cursor-pointer text-center disabled:opacity-50"
+                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isVerifyingDev}
-                  className="flex-1 bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#8A8A70] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
+                  className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
                   {isVerifyingDev ? (
                     <>
@@ -2045,7 +2049,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </p>
             </div>
 
-            <div className="space-y-3 text-xs text-[#5A5A40] bg-[#FDFCF8] p-4 rounded-xl border border-[#D6D6C2]/60 leading-relaxed">
+            <div className="space-y-3 text-xs text-[#0C2B64] bg-[#FDFCF8] p-4 rounded-xl border border-[#D6D6C2]/60 leading-relaxed">
               <p className="font-bold text-[#33332D] mb-1">Panduan:</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>Buka Google Sheets → Extensions → Apps Script</li>

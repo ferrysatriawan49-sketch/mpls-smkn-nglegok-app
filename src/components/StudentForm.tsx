@@ -344,7 +344,7 @@ function PhotoUpload({
             type="button"
             onClick={handleUpload}
             disabled={isUploading}
-            className="w-full bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
+            className="w-full bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
           >
             {isUploading ? (
               <>
@@ -362,7 +362,7 @@ function PhotoUpload({
           {isUploading && (
             <div className="w-full bg-[#E5E5D8] rounded-full h-2 overflow-hidden">
               <div 
-                className="bg-[#5A5A40] h-2 rounded-full transition-all duration-300"
+                className="bg-[#0C2B64] h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
@@ -746,12 +746,12 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
   return (
     <div className="min-h-screen bg-[#FDFCF8] pb-20 font-sans">
       {/* Top sticky action banner */}
-      <div className="sticky top-0 z-40 bg-[#5A5A40] text-white shadow-xs border-b border-[#4A4A35]">
+      <div className="sticky top-0 z-40 bg-[#0C2B64] text-white shadow-xs border-b border-[#081F48]">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button 
               onClick={onClose}
-              className="p-2 hover:bg-[#4A4A35] rounded-lg transition-colors text-white/80 hover:text-white"
+              className="p-2 hover:bg-[#081F48] rounded-lg transition-colors text-white/80 hover:text-white"
               title="Kembali ke Dashboard"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -763,9 +763,9 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 bg-[#4A4A35] px-3 py-1.5 rounded-full border border-[#5A5A40]/30">
+            <div className="hidden md:flex items-center gap-2 bg-[#081F48] px-3 py-1.5 rounded-full border border-[#0C2B64]/30">
               <span className="text-xs text-[#E5E5D8]">Total Progres:</span>
-              <div className="w-24 bg-[#5A5A40] rounded-full h-2">
+              <div className="w-24 bg-[#0C2B64] rounded-full h-2">
                 <div 
                   className="bg-white h-2 rounded-full transition-all duration-300" 
                   style={{ width: `${currentProgressPercent}%` }}
@@ -777,14 +777,14 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
             <div className="flex gap-2">
               <button
                 onClick={handleSaveDraft}
-                className="flex items-center gap-1.5 bg-[#4A4A35] hover:bg-[#3E3E2B] border border-[#5A5A40]/30 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 bg-[#081F48] hover:bg-[#3E3E2B] border border-[#0C2B64]/30 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
                 Simpan Draft
               </button>
               <button
                 onClick={handleFinalSubmit}
-                className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] text-[#5A5A40] px-4 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] text-[#0C2B64] px-4 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Kirim Form
@@ -824,11 +824,11 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                       className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-all cursor-pointer ${
                         isActive 
                           ? 'bg-[#F5F5F0] text-[#33332D] border border-[#D6D6C2] shadow-xs font-semibold' 
-                          : 'hover:bg-[#FDFCF8] text-[#5A5A40] border border-transparent'
+                          : 'hover:bg-[#FDFCF8] text-[#0C2B64] border border-transparent'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`p-1.5 rounded-lg ${isActive ? 'bg-[#5A5A40] text-white' : 'bg-[#F5F5F0] text-[#8A8A70]'}`}>
+                        <div className={`p-1.5 rounded-lg ${isActive ? 'bg-[#0C2B64] text-white' : 'bg-[#F5F5F0] text-[#8A8A70]'}`}>
                           {getTabIcon(group.icon)}
                         </div>
                         <div>
@@ -838,7 +838,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
-                          isCompleted ? 'bg-[#EEF9F1] text-emerald-800 border border-emerald-100' : 'bg-[#F5F5F0] text-[#5A5A40]'
+                          isCompleted ? 'bg-[#EEF9F1] text-emerald-800 border border-emerald-100' : 'bg-[#F5F5F0] text-[#0C2B64]'
                         }`}>
                           {stats.filled}/{stats.total}
                         </span>
@@ -876,11 +876,11 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                 <div key={group.id} className="divide-y divide-[#E0E0D6]">
                   <div className="p-6 bg-[#F5F5F0]">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-[#5A5A40] text-white">
+                      <div className="p-2.5 rounded-xl bg-[#0C2B64] text-white">
                         {getTabIcon(group.icon)}
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-[#5A5A40] uppercase tracking-widest font-mono">BAGIAN MPLS</span>
+                        <span className="text-[10px] font-bold text-[#0C2B64] uppercase tracking-widest font-mono">BAGIAN MPLS</span>
                         <h2 className="text-lg font-bold text-[#33332D] tracking-tight">{group.title}</h2>
                         <p className="text-xs text-[#8A8A70] mt-0.5">{group.description}</p>
                       </div>
@@ -927,7 +927,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                               {q.required && <span className="text-red-600 ml-1 font-bold">*</span>}
                             </label>
                             {isReadOnly && (
-                              <span className="text-[10px] bg-[#E5E5D8] text-[#5A5A40] px-2 py-0.5 rounded font-bold uppercase tracking-wider font-mono shrink-0">
+                              <span className="text-[10px] bg-[#E5E5D8] text-[#0C2B64] px-2 py-0.5 rounded font-bold uppercase tracking-wider font-mono shrink-0">
                                 Terkunci
                               </span>
                             )}
@@ -970,7 +970,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                   ? 'bg-[#F5F5F0] border-[#D6D6C2] text-[#8A8A70] cursor-not-allowed' 
                                   : error 
                                     ? 'border-red-300 focus:ring-red-100 focus:border-red-400 bg-white' 
-                                    : 'border-[#D6D6C2] focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white'
+                                    : 'border-[#D6D6C2] focus:ring-[#0C2B64]/10 focus:border-[#0C2B64] bg-white'
                               }`}
                             />
                           ) : q.type === 'date' ? (
@@ -981,7 +981,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                               className={`w-full px-4 py-2.5 rounded-lg border text-sm text-[#33332D] focus:outline-none focus:ring-2 transition-all ${
                                 error 
                                   ? 'border-red-300 focus:ring-red-100 focus:border-red-400 bg-white' 
-                                  : 'border-[#D6D6C2] focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white'
+                                  : 'border-[#D6D6C2] focus:ring-[#0C2B64]/10 focus:border-[#0C2B64] bg-white'
                               }`}
                             />
                           ) : q.type === 'select' ? (
@@ -991,7 +991,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                               className={`w-full px-4 py-2.5 rounded-lg border text-sm text-[#33332D] focus:outline-none focus:ring-2 transition-all ${
                                 error 
                                   ? 'border-red-300 focus:ring-red-100 focus:border-red-400 bg-white' 
-                                  : 'border-[#D6D6C2] focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white'
+                                  : 'border-[#D6D6C2] focus:ring-[#0C2B64]/10 focus:border-[#0C2B64] bg-white'
                               }`}
                             >
                               <option value="">-- Pilih opsi jawaban --</option>
@@ -1010,7 +1010,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                     onClick={() => handleInputChange(q.id, num)}
                                     className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center border font-semibold text-sm transition-all cursor-pointer ${
                                       isSelected
-                                        ? 'bg-[#5A5A40] border-[#5A5A40] text-white shadow-xs scale-105'
+                                        ? 'bg-[#0C2B64] border-[#0C2B64] text-white shadow-xs scale-105'
                                         : 'border-[#D6D6C2] text-[#33332D] hover:bg-[#F5F5F0]'
                                     }`}
                                   >
@@ -1025,7 +1025,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                           ) : q.type === 'multiselect' ? (
                             <div className="space-y-3">
                               {q.maxSelections && (
-                                <p className="text-[10px] font-bold text-[#5A5A40] uppercase font-mono">
+                                <p className="text-[10px] font-bold text-[#0C2B64] uppercase font-mono">
                                   * Maksimal pilih {q.maxSelections} opsi
                                 </p>
                               )}
@@ -1051,14 +1051,14 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                       }}
                                       className={`flex items-center gap-3 p-3 rounded-lg border text-left text-xs transition-all ${
                                         isSelected
-                                          ? 'bg-[#FDFCF8] border-[#5A5A40] text-[#33332D] font-medium shadow-xs'
+                                          ? 'bg-[#FDFCF8] border-[#0C2B64] text-[#33332D] font-medium shadow-xs'
                                           : !isSelected && limitReached
                                             ? 'bg-[#F5F5F0] border-[#E0E0D6] text-[#8A8A70] cursor-not-allowed opacity-60'
                                             : 'border-[#D6D6C2] text-[#33332D] hover:bg-[#F5F5F0] cursor-pointer'
                                       }`}
                                     >
                                       {isSelected ? (
-                                        <CheckSquare className="w-4 h-4 text-[#5A5A40] shrink-0" />
+                                        <CheckSquare className="w-4 h-4 text-[#0C2B64] shrink-0" />
                                       ) : (
                                         <Square className="w-4 h-4 text-[#8A8A70] shrink-0" />
                                       )}
@@ -1076,7 +1076,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                     value={answers[`${q.id}_other`] || ''}
                                     onChange={(e) => handleInputChange(`${q.id}_other`, e.target.value)}
                                     placeholder="Tuliskan isian manual lainnya di sini..."
-                                    className="w-full px-4 py-2 rounded-lg border border-[#D6D6C2] text-xs focus:outline-none focus:ring-2 focus:ring-[#5A5A40]/10 focus:border-[#5A5A40] bg-white text-[#33332D]"
+                                    className="w-full px-4 py-2 rounded-lg border border-[#D6D6C2] text-xs focus:outline-none focus:ring-2 focus:ring-[#0C2B64]/10 focus:border-[#0C2B64] bg-white text-[#33332D]"
                                   />
                                 </div>
                               )}
@@ -1109,7 +1109,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                     <button
                                       type="button"
                                       onClick={() => handleSimulatedUpload(q.id, 230, `foto_${q.id}_selfie.jpg`)}
-                                      className="text-[10px] bg-[#F5F5F0] hover:bg-[#E5E5D8] text-[#5A5A40] px-2.5 py-1.5 rounded-md font-semibold transition-colors cursor-pointer"
+                                      className="text-[10px] bg-[#F5F5F0] hover:bg-[#E5E5D8] text-[#0C2B64] px-2.5 py-1.5 rounded-md font-semibold transition-colors cursor-pointer"
                                     >
                                       Gunakan File Contoh (230 KB)
                                     </button>
@@ -1138,7 +1138,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                                   type="button"
                                   onClick={() => handleGPSLocation(q.id)}
                                   disabled={gpsLoading}
-                                  className="flex items-center gap-1.5 bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#F5F5F0] text-white disabled:text-[#8A8A70] px-4 py-2.5 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer shrink-0"
+                                  className="flex items-center gap-1.5 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#F5F5F0] text-white disabled:text-[#8A8A70] px-4 py-2.5 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer shrink-0"
                                 >
                                   {gpsLoading ? (
                                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1180,7 +1180,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                       <button
                         type="button"
                         onClick={handleNextSection}
-                        className="flex items-center gap-1.5 bg-[#5A5A40] hover:bg-[#4A4A35] text-white px-5 py-2 rounded-lg text-xs font-bold transition-all hover:translate-x-0.5 cursor-pointer shadow-xs"
+                        className="flex items-center gap-1.5 bg-[#0C2B64] hover:bg-[#081F48] text-white px-5 py-2 rounded-lg text-xs font-bold transition-all hover:translate-x-0.5 cursor-pointer shadow-xs"
                       >
                         Berikutnya
                         <ArrowRight className="w-3.5 h-3.5" />

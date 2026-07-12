@@ -207,7 +207,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
             type="button"
             onClick={handleUpload}
             disabled={isUploading}
-            className="w-full bg-[#5A5A40] hover:bg-[#4A4A35] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
+            className="w-full bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
           >
             {isUploading ? (
               <>
@@ -225,7 +225,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
           {isUploading && (
             <div className="w-full bg-[#E5E5D8] rounded-full h-2 overflow-hidden">
               <div 
-                className="bg-[#5A5A40] h-2 rounded-full transition-all duration-300"
+                className="bg-[#0C2B64] h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
