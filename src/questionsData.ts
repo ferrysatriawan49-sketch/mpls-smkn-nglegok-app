@@ -43,7 +43,7 @@ const IYA_BELUM = [
 // ============================================================
 const QUESTIONS_1_TO_70: Question[] = [
   { id: 'q1', number: 1, text: 'Nama Lengkap (Sesuai Data Pendaftaran)', type: 'text', required: true },
-  { id: 'q2', number: 2, text: 'NIS (Nomor Induk Siswa)', type: 'text', required: true },
+  { id: 'q2', number: 2, text: 'NISN (Nomor Induk Siswa Nasional)', type: 'text', required: true },
   { 
     id: 'q3', 
     number: 3, 

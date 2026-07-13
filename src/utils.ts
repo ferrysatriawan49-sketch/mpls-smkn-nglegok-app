@@ -10,7 +10,7 @@ export function exportToCSV(students: Student[]) {
   
   // Define headers: Metadata first, then Q1 to Q166
   const headers = [
-    'NIS',
+    'NISN',
     'Nama Lengkap',
     'Status Pengisian',
     'Persentase Progress',

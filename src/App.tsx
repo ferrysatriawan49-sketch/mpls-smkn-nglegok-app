@@ -792,12 +792,12 @@ export default function App() {
       return;
     }
     if (!newStudentName.trim() || !newStudentNis.trim()) {
-      alert('Nama Lengkap dan NIS wajib diisi!');
+      alert('Nama Lengkap dan NISN wajib diisi!');
       return;
     }
 
     if (students.some(s => s.nis === newStudentNis)) {
-      alert('Siswa dengan NIS tersebut sudah terdaftar!');
+      alert('Siswa dengan NISN tersebut sudah terdaftar!');
       return;
     }
 
@@ -948,7 +948,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
       setNisPassword('');
       setLoginError(null);
     } else {
-      setLoginError('NIS salah!');
+      setLoginError('NISN salah!');
     }
   };
 
@@ -1535,7 +1535,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 <Search className="w-4 h-4 absolute left-3 top-3 text-[#8A8A70]" />
                 <input
                   type="text"
-                  placeholder="Cari berdasarkan Nama atau NIS..."
+                  placeholder="Cari berdasarkan Nama atau NISN..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -1624,7 +1624,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 <thead>
                   <tr className="bg-[#F5F5F0] text-[#8A8A70] text-[11px] font-bold tracking-wider uppercase border-b border-[#E0E0D6]">
                     <th className="py-4 px-6">No</th>
-                    {isDevUnlocked && <th className="py-4 px-6">NIS</th>}
+                    {isDevUnlocked && <th className="py-4 px-6">NISN</th>}
                     <th className="py-4 px-6">Nama Lengkap</th>
                     <th className="py-4 px-6">Jurusan</th>
                     <th className="py-4 px-6">Progres</th>
@@ -1788,7 +1788,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </div>
               <span className="text-[10px] font-bold text-[#0C2B64] tracking-widest uppercase font-mono">Verifikasi Akses</span>
               <h3 className="text-lg font-black text-[#33332D] tracking-tight">Login Portal Siswa</h3>
-              <p className="text-xs text-[#8A8A70]">Masukkan NIS Anda untuk verifikasi identitas.</p>
+              <p className="text-xs text-[#8A8A70]">Masukkan NISN Anda untuk verifikasi identitas.</p>
             </div>
 
             <div className="bg-[#F5F5F0] rounded-xl p-4 border border-[#E0E0D6] space-y-1">
@@ -1801,11 +1801,11 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#33332D]">Masukkan NIS (Password):</label>
+                <label className="text-xs font-semibold text-[#33332D]">Masukkan NISN (Password):</label>
                 <input
                   type="password"
                   required
-                  placeholder="Ketik NIS Anda..."
+                  placeholder="Ketik NISN Anda..."
                   value={nisPassword}
                   onChange={(e) => {
                     setNisPassword(e.target.value);
@@ -1851,7 +1851,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
           <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <div className="text-center space-y-1">
               <h3 className="text-lg font-black text-[#33332D]">Tambah Siswa Baru</h3>
-              <p className="text-xs text-[#8A8A70]">Input nama dan NIS siswa baru.</p>
+              <p className="text-xs text-[#8A8A70]">Input nama dan NISN siswa baru.</p>
             </div>
 
             <form onSubmit={handleAddStudentSubmit} className="space-y-4">
@@ -1868,7 +1868,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#33332D]">NIS:</label>
+                <label className="text-xs font-semibold text-[#33332D]">NISN:</label>
                 <input
                   type="text"
                   required
@@ -2411,7 +2411,7 @@ function doPost(e) {
     var lastRow = sheet.getLastRow();
     
     if (lastRow === 0) {
-      var headers = ["ID", "NIS", "Nama Lengkap", "Status Progress", "Persentase Selesai (%)", "Terakhir Diperbarui"];
+      var headers = ["ID", "NISN", "Nama Lengkap", "Status Progress", "Persentase Selesai (%)", "Terakhir Diperbarui"];
       for (var i = 1; i <= 166; i++) {
         headers.push("Q" + i);
       }
@@ -2874,7 +2874,7 @@ function doPost(e) {
     var lastRow = sheet.getLastRow();
     
     if (lastRow === 0) {
-      var headers = ["ID", "NIS", "Nama Lengkap", "Status Progress", "Persentase Selesai (%)", "Terakhir Diperbarui"];
+      var headers = ["ID", "NISN", "Nama Lengkap", "Status Progress", "Persentase Selesai (%)", "Terakhir Diperbarui"];
       for (var i = 1; i <= 166; i++) {
         headers.push("Q" + i);
       }

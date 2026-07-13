@@ -758,7 +758,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <p className="text-xs text-[#E5E5D8] font-medium">Formulir MPLS &bull; NIS {student.nis}</p>
+              <p className="text-xs text-[#E5E5D8] font-medium">Formulir MPLS &bull; NISN {student.nis}</p>
               <h2 className="text-base font-extrabold text-white tracking-tight">{student.name}</h2>
             </div>
           </div>
@@ -860,7 +860,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
                 Anda dapat menyimpan progres pengisian data kapan saja dengan mengeklik tombol <strong>Simpan Draft</strong>. Data Anda akan disimpan dan dapat dilanjutkan nanti.
               </p>
               <p className="leading-relaxed font-semibold">
-                * Kolom nama dan NIS adalah bawaan sistem yang bersifat terkunci (read-only).
+                * Kolom nama dan NISN adalah bawaan sistem yang bersifat terkunci (read-only).
               </p>
               <p className="leading-relaxed text-amber-700">
                 📸 <strong>Upload Foto:</strong> Format JPG/PNG, Maks. 5 MB
