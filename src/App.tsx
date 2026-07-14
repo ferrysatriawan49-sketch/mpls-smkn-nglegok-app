@@ -13,12 +13,31 @@ import {
   Trash2, Mail, MapPin, ExternalLink, Calendar, ChevronLeft, ChevronRight, CheckSquare, ShieldCheck,
   Lock, Unlock
 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient, isSupabaseConfigured, getSupabaseCredentials } from './supabaseClient';
 
 export default function App() {
   // ============================================================
   // 1. SEMUA useState
   // ============================================================
   const [students, setStudents] = useState<Student[]>([]);
+  const [dbMode, setDbMode] = useState<'sheets' | 'supabase'>(() => {
+    const savedMode = localStorage.getItem('mpls_db_mode');
+    if (savedMode === 'sheets' || savedMode === 'supabase') {
+      return savedMode;
+    }
+    // If Supabase is already configured, default to it
+    return isSupabaseConfigured() ? 'supabase' : 'sheets';
+  });
+
+  const [supabaseUrl, setSupabaseUrl] = useState(() => {
+    return (import.meta as any).env.VITE_SUPABASE_URL || localStorage.getItem('mpls_supabase_url') || '';
+  });
+  
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState(() => {
+    return (import.meta as any).env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('mpls_supabase_anon_key') || '';
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [jurusanFilter, setJurusanFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -84,6 +103,14 @@ export default function App() {
   const [devCredsSuccess, setDevCredsSuccess] = useState('');
   const [showChangeCredsForm, setShowChangeCredsForm] = useState(false);
 
+  // States for testing Supabase connection
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionTestResult, setConnectionTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: string;
+  } | null>(null);
+
   // Add Custom Student State
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
@@ -128,6 +155,18 @@ export default function App() {
   }, [googleSheetsUrl]);
 
   useEffect(() => {
+    localStorage.setItem('mpls_db_mode', dbMode);
+  }, [dbMode]);
+
+  useEffect(() => {
+    localStorage.setItem('mpls_supabase_url', supabaseUrl);
+  }, [supabaseUrl]);
+
+  useEffect(() => {
+    localStorage.setItem('mpls_supabase_anon_key', supabaseAnonKey);
+  }, [supabaseAnonKey]);
+
+  useEffect(() => {
     localStorage.setItem('mpls_dev_unlocked', String(isDevUnlocked));
   }, [isDevUnlocked]);
 
@@ -165,9 +204,56 @@ export default function App() {
     }
 
     const autoFetchData = async () => {
-      console.log('🔄 Auto-fetch data dari Google Sheets...');
       setIsLoading(true);
       
+      if (dbMode === 'supabase') {
+        console.log('🔄 Auto-fetch data dari Supabase...');
+        try {
+          const client = getSupabaseClient();
+          if (!client) {
+            console.warn('⚠️ Supabase belum dikonfigurasi, skip auto-fetch');
+            setIsLoading(false);
+            return;
+          }
+          const { data, error } = await (client
+            .from('students')
+            .select('*')
+            .order('name', { ascending: true }) as any);
+          
+          if (error) {
+            throw error;
+          }
+          
+          if (data && data.length > 0) {
+            const mappedStudents: Student[] = (data as any[]).map(item => ({
+              id: item.id,
+              nis: item.nis,
+              name: item.name,
+              progress: item.progress,
+              progressPercent: item.progress_percent,
+              answers: item.answers || {},
+              lastUpdated: item.last_updated
+            }));
+            setStudents(mappedStudents);
+            localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(mappedStudents));
+            localStorage.setItem('mpls_initial_load_done', 'true');
+            console.log(`✅ Auto-fetch Supabase berhasil: ${mappedStudents.length} data siswa dimuat`);
+          } else {
+            console.log('ℹ️ Tidak ada data di Supabase');
+            setStudents([]);
+            localStorage.setItem('mpls_initial_load_done', 'true');
+          }
+        } catch (err) {
+          console.error('❌ Auto-fetch Supabase gagal:', err);
+          setStudents([]);
+          localStorage.setItem('mpls_initial_load_done', 'true');
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      console.log('🔄 Auto-fetch data dari Google Sheets...');
       try {
         const url = googleSheetsUrl;
         if (!url || !url.startsWith('http')) {
@@ -219,7 +305,7 @@ export default function App() {
     };
 
     autoFetchData();
-  }, [googleSheetsUrl]);
+  }, [googleSheetsUrl, dbMode]);
 
   // ============================================================
   // 🔥 REFRESH OTOMATIS SETIAP 60 DETIK
@@ -231,9 +317,9 @@ export default function App() {
       }
       
       const interval = setInterval(() => {
-        console.log('🔄 Refresh otomatis data dari Google Sheets...');
+        console.log(`🔄 Refresh otomatis data dari ${dbMode === 'supabase' ? 'Supabase' : 'Google Sheets'}...`);
         if (!isAutoSyncing && !isSyncing) {
-          refreshDataFromSheets();
+          refreshData();
         }
       }, 60000);
       
@@ -250,7 +336,7 @@ export default function App() {
         setRefreshInterval(null);
       }
     }
-  }, [selectedStudent, loginStudent, isAutoSyncing, isSyncing]);
+  }, [selectedStudent, loginStudent, isAutoSyncing, isSyncing, dbMode]);
 
   // ============================================================
   // 5. SEMUA FUNGSI
@@ -273,9 +359,52 @@ export default function App() {
   };
 
   // ============================================================
-  // 🔥 FUNGSI REFRESH DATA DARI SHEETS
+  // 🔥 FUNGSI REFRESH DATA (DARI SHEETS ATAU SUPABASE)
   // ============================================================
-  const refreshDataFromSheets = async () => {
+  const refreshData = async () => {
+    if (dbMode === 'supabase') {
+      if (isRefreshing) return;
+      setIsRefreshing(true);
+      try {
+        const client = getSupabaseClient();
+        if (!client) {
+          console.warn('⚠️ Supabase belum dikonfigurasi, skip refresh');
+          return;
+        }
+        const { data, error } = await (client
+          .from('students')
+          .select('*')
+          .order('name', { ascending: true }) as any);
+        
+        if (error) throw error;
+        
+        if (data) {
+          const mappedStudents: Student[] = (data as any[]).map(item => ({
+            id: item.id,
+            nis: item.nis,
+            name: item.name,
+            progress: item.progress,
+            progressPercent: item.progress_percent,
+            answers: item.answers || {},
+            lastUpdated: item.last_updated
+          }));
+          const currentData = JSON.stringify(students);
+          const newData = JSON.stringify(mappedStudents);
+          
+          if (currentData !== newData) {
+            console.log('🔄 Ada perubahan data Supabase, update...');
+            setStudents(mappedStudents);
+            localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(mappedStudents));
+          }
+        }
+      } catch (err) {
+        console.error('❌ Refresh Supabase gagal:', err);
+      } finally {
+        setIsRefreshing(false);
+      }
+      return;
+    }
+
     if (!googleSheetsUrl.trim()) {
       console.warn('⚠️ URL Google Sheets belum diset, skip refresh');
       return;
@@ -334,6 +463,91 @@ export default function App() {
   };
 
   // ============================================================
+  // ⚡ TES KONEKSI SUPABASE DENGAN DIAGNOSTIK
+  // ============================================================
+  const handleTestSupabaseConnection = async (customUrl?: string, customKey?: string) => {
+    setIsTestingConnection(true);
+    setConnectionTestResult(null);
+
+    const urlToUse = (customUrl !== undefined ? customUrl : supabaseUrl).trim();
+    const keyToUse = (customKey !== undefined ? customKey : supabaseAnonKey).trim();
+
+    if (!urlToUse || !keyToUse) {
+      setIsTestingConnection(false);
+      setConnectionTestResult({
+        success: false,
+        message: 'Gagal Koneksi: URL Supabase atau Anon Key masih kosong!'
+      });
+      return;
+    }
+
+    if (!urlToUse.startsWith('http')) {
+      setIsTestingConnection(false);
+      setConnectionTestResult({
+        success: false,
+        message: 'Gagal Koneksi: URL Supabase harus diawali dengan http:// atau https://'
+      });
+      return;
+    }
+
+    try {
+      const testClient = createClient(urlToUse, keyToUse, {
+        auth: { persistSession: false }
+      });
+
+      // 1. Coba query tabel developers
+      const { data: devData, error: devError } = await (testClient
+        .from('developers')
+        .select('*')
+        .limit(1) as any);
+
+      let devDetails = '';
+      if (devError) {
+        devDetails = `Tabel "developers" Error: ${devError.message} (Kode: ${devError.code || 'N/A'})`;
+      } else {
+        devDetails = `Tabel "developers" OK ✓ (Dapat membaca data. Ditemukan ${devData?.length || 0} record)`;
+      }
+
+      // 2. Coba query tabel students
+      const { data: studentData, error: studentError } = await (testClient
+        .from('students')
+        .select('*')
+        .limit(1) as any);
+
+      let studentDetails = '';
+      if (studentError) {
+        studentDetails = `Tabel "students" Error: ${studentError.message} (Kode: ${studentError.code || 'N/A'})`;
+      } else {
+        studentDetails = `Tabel "students" OK ✓ (Dapat membaca data. Ditemukan ${studentData?.length || 0} record)`;
+      }
+
+      const isSuccess = !devError && !studentError;
+
+      if (isSuccess) {
+        setConnectionTestResult({
+          success: true,
+          message: 'Koneksi Berhasil ✓',
+          details: `Aplikasi terhubung ke Supabase dengan sukses!\n- ${devDetails}\n- ${studentDetails}`
+        });
+      } else {
+        setConnectionTestResult({
+          success: false,
+          message: 'Koneksi Terhubung, tapi ada masalah tabel:',
+          details: `Beberapa tabel gagal dimuat:\n- ${devDetails}\n- ${studentDetails}\n\nSilakan pastikan tabel "developers" dan "students" sudah dibuat dengan kolom yang benar di database Supabase Anda.`
+        });
+      }
+    } catch (err: any) {
+      setConnectionTestResult({
+        success: false,
+        message: 'Koneksi Gagal / Ditolak:',
+        details: err.message || 'Periksa kembali URL dan koneksi internet Anda.'
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  // ============================================================
   // 🔥 HANDLE DEVELOPER LOGIN
   // ============================================================
   const handleDevUnlockSubmit = async (e: React.FormEvent) => {
@@ -348,6 +562,72 @@ export default function App() {
 
     setIsVerifyingDev(true);
     setDevPasswordError('');
+
+    if (dbMode === 'supabase') {
+      try {
+        const client = getSupabaseClient();
+        if (!client) {
+          if (cleanEmail === 'admin@smk.id' && cleanPassword === 'admin123') {
+            setIsDevUnlocked(true);
+            setShowDevPrompt(false);
+            setInputDevEmail('');
+            setInputDevPassword('');
+            setIsVerifyingDev(false);
+            alert('✅ Akses developer berhasil dikonfirmasi (Lokal Fallback)!');
+            return;
+          }
+          throw new Error('Supabase belum dikonfigurasi. Silakan masuk dengan admin@smk.id / admin123 untuk membuka panel.');
+        }
+
+        const { data, error } = await client
+          .from('developers')
+          .select('*')
+          .eq('email', cleanEmail)
+          .eq('password', cleanPassword)
+          .maybeSingle();
+
+        if (error) {
+          if (cleanEmail === 'admin@smk.id' && cleanPassword === 'admin123') {
+            setIsDevUnlocked(true);
+            setShowDevPrompt(false);
+            setInputDevEmail('');
+            setInputDevPassword('');
+            setIsVerifyingDev(false);
+            alert('✅ Akses developer berhasil (Lokal Fallback karena tabel developers belum ada)!');
+            return;
+          }
+          throw error;
+        }
+
+        if (data) {
+          setIsDevUnlocked(true);
+          setShowDevPrompt(false);
+          setInputDevEmail('');
+          setInputDevPassword('');
+          setIsVerifyingDev(false);
+          alert('✅ Akses developer berhasil dikonfirmasi!');
+          return;
+        } else {
+          if (cleanEmail === 'admin@smk.id' && cleanPassword === 'admin123') {
+            setIsDevUnlocked(true);
+            setShowDevPrompt(false);
+            setInputDevEmail('');
+            setInputDevPassword('');
+            setIsVerifyingDev(false);
+            alert('✅ Akses developer berhasil dikonfirmasi (Lokal Fallback)!');
+            return;
+          }
+          setDevPasswordError('❌ Email atau Password salah! Periksa tabel "developers" di Supabase.');
+          setIsVerifyingDev(false);
+          return;
+        }
+      } catch (err: any) {
+        console.error('Gagal verifikasi Supabase:', err);
+        setDevPasswordError(`❌ Gagal verifikasi: ${err.message || 'Koneksi ditolak'}`);
+        setIsVerifyingDev(false);
+        return;
+      }
+    }
 
     const hasSheetsUrl = googleSheetsUrl && googleSheetsUrl.startsWith('http');
 
@@ -484,6 +764,64 @@ export default function App() {
       return;
     }
 
+    if (dbMode === 'supabase') {
+      setIsUpdatingDevCreds(true);
+      try {
+        const client = getSupabaseClient();
+        if (!client) {
+          throw new Error('Supabase belum dikonfigurasi!');
+        }
+
+        // Check if the current credentials match, or let default fallback pass
+        const { data: verifyData, error: verifyErr } = await client
+          .from('developers')
+          .select('*')
+          .eq('email', currentEmailClean)
+          .eq('password', currentPasswordClean)
+          .maybeSingle();
+
+        const isDefaultCreds = currentEmailClean === 'admin@smk.id' && currentPasswordClean === 'admin123';
+
+        if (verifyErr && !isDefaultCreds) {
+          throw verifyErr;
+        }
+
+        if (!verifyData && !isDefaultCreds) {
+          throw new Error('Kredensial developer saat ini salah!');
+        }
+
+        // Upsert new credentials
+        const { error: upsertErr } = await (client
+          .from('developers') as any)
+          .upsert({
+            email: newEmailClean,
+            password: newPasswordClean
+          });
+
+        if (upsertErr) throw upsertErr;
+
+        // If email changed and old existed in database, clean up old record
+        if (verifyData && currentEmailClean !== newEmailClean) {
+          await (client
+            .from('developers') as any)
+            .delete()
+            .eq('email', currentEmailClean);
+        }
+
+        setDevCredsSuccess('✅ Berhasil! Kredensial developer di Supabase telah diperbarui.');
+        setDevCurrentEmail('');
+        setDevCurrentPassword('');
+        setDevNewEmail('');
+        setDevNewPassword('');
+      } catch (err: any) {
+        console.error(err);
+        setDevCredsError('❌ Gagal memperbarui di Supabase: ' + err.message);
+      } finally {
+        setIsUpdatingDevCreds(false);
+      }
+      return;
+    }
+
     const hasSheetsUrl = googleSheetsUrl && googleSheetsUrl.startsWith('http');
     
     if (!hasSheetsUrl) {
@@ -531,9 +869,77 @@ export default function App() {
   };
 
   // ============================================================
-  // 🔥 FUNGSI SYNC KE GOOGLE SHEETS
+  // 🔥 FUNGSI SYNC KE GOOGLE SHEETS ATAU SUPABASE (AUTO)
   // ============================================================
-  const syncToGoogleSheets = useCallback(async (studentsToSync: Student[]) => {
+  const syncToDatabase = useCallback(async (studentsToSync: Student[]) => {
+    if (dbMode === 'supabase') {
+      if (!studentsToSync || studentsToSync.length === 0) {
+        console.warn('⚠️ Tidak ada data untuk disinkronkan');
+        return;
+      }
+
+      setIsAutoSyncing(true);
+      setAutoSyncStatus('syncing');
+      setSaveStatus('saving');
+
+      try {
+        const client = getSupabaseClient();
+        if (!client) {
+          throw new Error('Supabase belum dikonfigurasi, skip sync');
+        }
+
+        console.log(`🔄 Menyinkronkan ${studentsToSync.length} data siswa ke Supabase...`);
+
+        const dbStudents = studentsToSync.map(s => ({
+          id: s.id,
+          nis: s.nis,
+          name: s.name,
+          progress: s.progress,
+          progress_percent: s.progressPercent,
+          answers: s.answers || {},
+          last_updated: s.lastUpdated || new Date().toISOString()
+        }));
+
+        const { error } = await (client
+          .from('students') as any)
+          .upsert(dbStudents);
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('✅ Sinkronisasi Supabase berhasil');
+        setAutoSyncStatus('success');
+        setSaveStatus('success');
+        setLastSaved(new Date());
+        
+        localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(studentsToSync));
+        
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setAutoSyncStatus(prev => prev === 'success' ? 'idle' : prev);
+            setSaveStatus('idle');
+          }
+        }, 2000);
+      } catch (err: any) {
+        console.error('❌ Sinkronisasi Supabase gagal:', err);
+        setAutoSyncStatus('error');
+        setSaveStatus('error');
+        
+        localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(studentsToSync));
+        
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setAutoSyncStatus('idle');
+            setSaveStatus('idle');
+          }
+        }, 3000);
+      } finally {
+        setIsAutoSyncing(false);
+      }
+      return;
+    }
+
     if (!googleSheetsUrl || !googleSheetsUrl.trim().startsWith('http')) {
       console.warn('⚠️ URL Google Sheets tidak valid, skip sync');
       return;
@@ -599,7 +1005,7 @@ export default function App() {
     } finally {
       setIsAutoSyncing(false);
     }
-  }, [googleSheetsUrl]);
+  }, [googleSheetsUrl, dbMode]);
 
   // ============================================================
   // 🔥 SAVE STUDENTS TO DB (DENGAN FORCE SYNC)
@@ -611,14 +1017,14 @@ export default function App() {
     localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(updatedStudents));
     
     if (forceSync) {
-      syncToGoogleSheets(updatedStudents);
+      syncToDatabase(updatedStudents);
     } else {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
       
       syncTimeoutRef.current = setTimeout(() => {
-        syncToGoogleSheets(updatedStudents);
+        syncToDatabase(updatedStudents);
         syncTimeoutRef.current = null;
       }, 500);
     }
@@ -626,12 +1032,75 @@ export default function App() {
     setSaveStatus('saving');
     setIsSaving(true);
     
-  }, [syncToGoogleSheets]);
+  }, [syncToDatabase]);
 
   // ============================================================
-  // 🔥 HANDLE PULL SHEETS
+  // 🔥 HANDLE PULL SHEETS / SUPABASE
   // ============================================================
   const handlePullSheets = async () => {
+    if (dbMode === 'supabase') {
+      setIsSyncing(true);
+      setSyncLogs([]);
+
+      const log = (msg: string) => {
+        setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
+      };
+
+      log('Menghubungkan ke database Supabase...');
+      log('Mempersiapkan penarikan data siswa...');
+
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const client = getSupabaseClient();
+        if (!client) {
+          throw new Error('Supabase belum dikonfigurasi. Periksa URL dan Anon Key.');
+        }
+
+        log('Mengirim query untuk membaca tabel "students"...');
+        const { data, error } = await (client
+          .from('students')
+          .select('*')
+          .order('name', { ascending: true }) as any);
+
+        if (error) {
+          throw error;
+        }
+
+        const importedCount = data ? data.length : 0;
+        log(`✓ BERHASIL: Menemukan ${importedCount} data siswa di Supabase.`);
+
+        if (importedCount > 0) {
+          const mappedStudents: Student[] = (data as any[]).map(item => ({
+            id: item.id,
+            nis: item.nis,
+            name: item.name,
+            progress: item.progress,
+            progressPercent: item.progress_percent,
+            answers: item.answers || {},
+            lastUpdated: item.last_updated
+          }));
+          setStudents(mappedStudents);
+          localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(mappedStudents));
+          localStorage.setItem('mpls_initial_load_done', 'true');
+          resetAllFilters();
+          log(`✓ ${importedCount} data siswa berhasil dimuat!`);
+          alert(`Berhasil menarik data! ${importedCount} data siswa dari Supabase telah diimpor.`);
+        } else {
+          log('⚠️ Supabase mengembalikan 0 baris siswa.');
+          setStudents([]);
+          localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify([]));
+          alert('Berhasil terhubung ke Supabase, namun tidak ditemukan data siswa.');
+        }
+      } catch (err: any) {
+        console.error('Gagal mengambil data Supabase:', err);
+        log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
+        alert(`Gagal mengambil data siswa dari Supabase!\n\nError: ${err.message || 'Unknown error'}`);
+      } finally {
+        setIsSyncing(false);
+      }
+      return;
+    }
+
     if (!googleSheetsUrl.trim()) {
       alert('Masukkan URL Google Apps Script Web App terlebih dahulu!');
       return;
@@ -710,16 +1179,65 @@ export default function App() {
   };
 
   // ============================================================
-  // 🔥 HANDLE SYNC SHEETS (MANUAL)
+  // 🔥 HANDLE SYNC SHEETS / SUPABASE (MANUAL)
   // ============================================================
   const handleSyncSheets = async () => {
-    if (!googleSheetsUrl.trim()) {
-      alert('Masukkan URL Google Apps Script Web App terlebih dahulu!');
+    if (!students || students.length === 0) {
+      alert('Tidak ada data siswa untuk disinkronkan!');
       return;
     }
 
-    if (!students || students.length === 0) {
-      alert('Tidak ada data siswa untuk disinkronkan!');
+    if (dbMode === 'supabase') {
+      setIsSyncing(true);
+      setSyncLogs([]);
+
+      const log = (msg: string) => {
+        setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
+      };
+
+      log('Menghubungkan ke database Supabase...');
+      log(`Mempersiapkan unggahan ${students.length} data siswa...`);
+
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const client = getSupabaseClient();
+        if (!client) {
+          throw new Error('Supabase belum dikonfigurasi.');
+        }
+
+        log('Mengirim data (bulk upsert) ke Supabase...');
+        const dbStudents = students.map(s => ({
+          id: s.id,
+          nis: s.nis,
+          name: s.name,
+          progress: s.progress,
+          progress_percent: s.progressPercent,
+          answers: s.answers || {},
+          last_updated: s.lastUpdated || new Date().toISOString()
+        }));
+
+        const { error } = await (client
+          .from('students') as any)
+          .upsert(dbStudents);
+
+        if (error) {
+          throw error;
+        }
+
+        log('✓ BERHASIL: Semua data siswa berhasil diunggah ke Supabase!');
+        setLastSaved(new Date());
+        alert('✅ Sinkronisasi Supabase berhasil! Semua data telah diperbarui di database.');
+      } catch (err: any) {
+        log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
+        alert(`Gagal sinkronisasi Supabase!\n\nError: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+      return;
+    }
+
+    if (!googleSheetsUrl.trim()) {
+      alert('Masukkan URL Google Apps Script Web App terlebih dahulu!');
       return;
     }
 
@@ -760,6 +1278,126 @@ export default function App() {
     } catch (err: any) {
       log(`❌ GAGAL: ${err.message || 'Koneksi ditolak'}`);
       alert('❌ Gagal sinkronisasi. Periksa koneksi dan URL Web App.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // ============================================================
+  // 🔥 HANDLE MIGRASI DATA: GOOGLE SHEETS ➔ SUPABASE (1-CLICK)
+  // ============================================================
+  const handleMigrateSheetsToSupabase = async () => {
+    if (!isDevUnlocked) {
+      alert('Akses ditolak! Anda harus masuk sebagai developer.');
+      return;
+    }
+
+    if (!googleSheetsUrl || !googleSheetsUrl.trim().startsWith('http')) {
+      alert('Tentukan URL Google Sheets terlebih dahulu di panel integrasi!');
+      return;
+    }
+
+    const testClient = getSupabaseClient();
+    if (!testClient) {
+      alert('Supabase belum terkonfigurasi! Pastikan Anda telah memasukkan URL dan Anon Key Supabase Anda.');
+      return;
+    }
+
+    const confirmMigration = confirm(
+      "🚀 DETEKSI MIGRASI SATU-KLIK\n\nApakah Anda yakin ingin memindahkan seluruh data dari Google Sheets ke database Supabase?\n\nSistem akan otomatis:\n1. Menarik seluruh data dari Google Sheets\n2. Melakukan bulk upsert langsung ke database Supabase Anda\n\nKlik OK untuk memulai migrasi."
+    );
+    if (!confirmMigration) return;
+
+    setIsSyncing(true);
+    setSyncLogs([]);
+
+    const log = (msg: string) => {
+      setSyncLogs(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
+    };
+
+    try {
+      log('🎬 MEMULAI MIGRASI: Google Sheets ➔ Supabase...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      log('📥 Menghubungkan ke API Google Sheets Web App...');
+      let response;
+
+      try {
+        log('Mencoba membaca data via POST...');
+        response = await fetch(googleSheetsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'fetchStudents' })
+        });
+      } catch (postErr) {
+        log('⚠️ Gagal via POST, mencoba GET...');
+        try {
+          const getUrl = googleSheetsUrl.includes('?') 
+            ? `${googleSheetsUrl}&action=fetchStudents` 
+            : `${googleSheetsUrl}?action=fetchStudents`;
+          response = await fetch(getUrl, { method: 'GET' });
+        } catch (getErr: any) {
+          throw new Error(`Gagal terhubung ke Google Sheets: ${getErr.message}`);
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Koneksi Google Sheets ditolak: HTTP ${response?.status || 'Unknown'}`);
+      }
+
+      const result = await response.json();
+      if (result.status !== 'success' || !result.students) {
+        throw new Error(result.message || 'Data siswa dari Google Sheets kosong atau tidak valid.');
+      }
+
+      const fetchedStudents: Student[] = result.students;
+      const importedCount = fetchedStudents.length;
+      log(`✓ BERHASIL MEMBACA: Menemukan ${importedCount} data siswa dari Google Sheets.`);
+
+      if (importedCount === 0) {
+        throw new Error('Tidak ada data siswa yang ditemukan di Google Sheets untuk dimigrasikan.');
+      }
+
+      log('📤 Menghubungkan ke database Supabase...');
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase gagal diinisialisasi. Periksa kredensial Anda.');
+      }
+
+      log(`⚙️ Mempersiapkan bulk upsert ${importedCount} data siswa ke tabel "students"...`);
+      const dbStudents = fetchedStudents.map(s => ({
+        id: s.id,
+        nis: s.nis,
+        name: s.name,
+        progress: s.progress,
+        progress_percent: s.progressPercent,
+        answers: s.answers || {},
+        last_updated: s.lastUpdated || new Date().toISOString()
+      }));
+
+      log('📦 Mengirim data dalam bentuk batch/bulk ke Supabase...');
+      const { error: upsertErr } = await (client
+        .from('students') as any)
+        .upsert(dbStudents);
+
+      if (upsertErr) {
+        throw upsertErr;
+      }
+
+      log('💾 Menyimpan salinan data terbaru ke local storage browser...');
+      setStudents(fetchedStudents);
+      localStorage.setItem('mpls_smkn_nglegok_students', JSON.stringify(fetchedStudents));
+      localStorage.setItem('mpls_initial_load_done', 'true');
+      resetAllFilters();
+
+      log(`🎉 SUKSES! Sebanyak ${importedCount} data siswa berhasil dipindahkan dari Google Sheets ke Supabase.`);
+      alert(`🎉 MIGRASI BERHASIL!\n\nSebanyak ${importedCount} data siswa telah berhasil dipindahkan dari Google Sheets ke database Supabase.`);
+    } catch (err: any) {
+      console.error('Migrasi gagal:', err);
+      log(`❌ MIGRASI GAGAL: ${err.message || 'Unknown error'}`);
+      alert(`❌ Migrasi Gagal!\n\nError: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSyncing(false);
     }
@@ -1008,7 +1646,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
         onSave={handleSaveStudentAnswers}
         onClose={() => {
           setSelectedStudent(null);
-          refreshDataFromSheets();
+          refreshData();
         }}
       />
     );
@@ -1240,49 +1878,176 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
 
         {/* GOOGLE SHEETS INTEGRATION PANEL */}
         {isDevUnlocked && showSyncPanel && (
-          <div className="bg-white border border-[#D6D6C2] rounded-2xl p-6 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="bg-white border border-[#D6D6C2] rounded-2xl p-6 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-fade-in">
             <div className="lg:col-span-5 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#0C2B64] font-bold text-sm">
-                  <FileSpreadsheet className="w-5 h-5 text-[#0C2B64]" />
-                  <span>Modul Integrasi Google Sheets</span>
+                  {dbMode === 'supabase' ? (
+                    <Database className="w-5 h-5 text-indigo-700 animate-pulse" />
+                  ) : (
+                    <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                  )}
+                  <span>Modul Integrasi {dbMode === 'supabase' ? 'Supabase' : 'Google Sheets'}</span>
                 </div>
-                <button
-                  onClick={() => setIsDevUnlocked(false)}
-                  className="text-[10px] text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 font-bold"
-                >
-                  <Lock className="w-2.5 h-2.5" /> Kunci
-                </button>
-              </div>
-              <h4 className="text-base font-extrabold text-[#33332D]">Sinkronisasi & Konfigurasi Lembar Data</h4>
-              <p className="text-xs text-[#8A8A70] leading-relaxed">
-                Koneksikan langsung data kuesioner dengan Spreadsheet sekolah Anda.
-              </p>
-
-              <div className="space-y-1.5 bg-[#FDFCF8] p-3 rounded-xl border border-[#D6D6C2]/60">
-                <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
-                  URL Web App Google Apps Script:
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={googleSheetsUrlInput}
-                    onChange={(e) => setGoogleSheetsUrlInput(e.target.value)}
-                    placeholder="https://script.google.com/macros/s/.../exec"
-                    className="flex-1 min-w-0 bg-white border border-[#D6D6C2] rounded-lg px-3 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] font-mono"
-                  />
+                <div className="flex items-center gap-1.5">
+                  {/* Small Database Mode Switcher inside panel */}
+                  <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-0.5 flex text-[9px] font-bold font-mono">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbMode('sheets');
+                        setConnectionTestResult(null);
+                      }}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        dbMode === 'sheets' ? 'bg-[#0C2B64] text-white shadow-xs' : 'text-[#8A8A70]'
+                      }`}
+                    >
+                      Sheets
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbMode('supabase');
+                        setConnectionTestResult(null);
+                      }}
+                      className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        dbMode === 'supabase' ? 'bg-[#0C2B64] text-white shadow-xs' : 'text-[#8A8A70]'
+                      }`}
+                    >
+                      Supabase
+                    </button>
+                  </div>
                   <button
-                    onClick={() => handleSaveSheetsUrl()}
-                    className={`shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition-all cursor-pointer shadow-xs ${
-                      urlSavedSuccess 
-                        ? 'bg-emerald-600 hover:bg-emerald-700' 
-                        : 'bg-[#0C2B64] hover:bg-[#081F48]'
-                    }`}
+                    onClick={() => setIsDevUnlocked(false)}
+                    className="text-[10px] text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 font-bold"
                   >
-                    {urlSavedSuccess ? 'Tersimpan ✓' : 'Simpan URL'}
+                    <Lock className="w-2.5 h-2.5" /> Kunci
                   </button>
                 </div>
               </div>
+
+              {dbMode === 'supabase' ? (
+                <>
+                  <h4 className="text-base font-extrabold text-[#33332D]">Sinkronisasi & Konfigurasi Database Supabase</h4>
+                  <p className="text-xs text-[#8A8A70] leading-relaxed">
+                    Koneksikan langsung data kuesioner dengan tabel <code className="bg-[#E5E5D8]/50 px-1 rounded font-mono">students</code> dan <code className="bg-[#E5E5D8]/50 px-1 rounded font-mono">developers</code> di Supabase.
+                  </p>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold text-slate-800 uppercase font-mono tracking-wider">
+                        ⚙️ Konfigurasi Supabase:
+                      </span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold font-mono border ${
+                        isSupabaseConfigured() 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {isSupabaseConfigured() ? 'Terkonfigurasi ✓' : 'Belum Konfigurasi'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          Supabase URL:
+                        </label>
+                        <input
+                          type="text"
+                          value={supabaseUrl}
+                          onChange={(e) => setSupabaseUrl(e.target.value)}
+                          placeholder="https://xxxx.supabase.co"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          Supabase Anon Key:
+                        </label>
+                        <input
+                          type="password"
+                          value={supabaseAnonKey}
+                          onChange={(e) => setSupabaseAnonKey(e.target.value)}
+                          placeholder="eyJhbGciOi..."
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Test Connection Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleTestSupabaseConnection()}
+                      disabled={isTestingConnection}
+                      className="w-full bg-slate-800 hover:bg-slate-950 text-white py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+                    >
+                      {isTestingConnection ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Sedang Menguji Koneksi...
+                        </>
+                      ) : (
+                        '🔌 Uji & Deteksi Koneksi'
+                      )}
+                    </button>
+
+                    {/* Connection Test Outcome */}
+                    {connectionTestResult && (
+                      <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
+                        connectionTestResult.success
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border-rose-200 text-rose-800'
+                      }`}>
+                        <div className="font-bold flex items-center gap-1.5 mb-1">
+                          {connectionTestResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          )}
+                          {connectionTestResult.message}
+                        </div>
+                        {connectionTestResult.details && (
+                          <p className="text-[10px] opacity-90 font-mono whitespace-pre-wrap leading-tight mt-1 bg-white/50 p-1.5 rounded border border-black/5 max-h-24 overflow-y-auto">
+                            {connectionTestResult.details}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h4 className="text-base font-extrabold text-[#33332D]">Sinkronisasi & Konfigurasi Lembar Data</h4>
+                  <p className="text-xs text-[#8A8A70] leading-relaxed">
+                    Koneksikan langsung data kuesioner dengan Spreadsheet sekolah Anda.
+                  </p>
+
+                  <div className="space-y-1.5 bg-[#FDFCF8] p-3 rounded-xl border border-[#D6D6C2]/60">
+                    <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
+                      URL Web App Google Apps Script:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={googleSheetsUrlInput}
+                        onChange={(e) => setGoogleSheetsUrlInput(e.target.value)}
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        className="flex-1 min-w-0 bg-white border border-[#D6D6C2] rounded-lg px-3 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] font-mono"
+                      />
+                      <button
+                        onClick={() => handleSaveSheetsUrl()}
+                        className={`shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition-all cursor-pointer shadow-xs ${
+                          urlSavedSuccess 
+                            ? 'bg-emerald-600 hover:bg-emerald-700' 
+                            : 'bg-[#0C2B64] hover:bg-[#081F48]'
+                        }`}
+                      >
+                        {urlSavedSuccess ? 'Tersimpan ✓' : 'Simpan URL'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* CHANGE CREDENTIALS FORM */}
               <div className="border border-[#D6D6C2]/60 rounded-xl overflow-hidden bg-[#FDFCF8] text-left">
@@ -1414,7 +2179,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   className="flex items-center gap-1.5 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#E5E5D8] text-white disabled:text-[#8A8A70] px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Sinkronisasi...' : 'Sinkronkan Google Sheets'}
+                  {isSyncing ? 'Sinkronisasi...' : dbMode === 'supabase' ? 'Unggah ke Supabase' : 'Sinkronkan Google Sheets'}
                 </button>
                 <button
                   onClick={handlePullSheets}
@@ -1422,8 +2187,20 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-[#E5E5D8] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
                   <Download className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Menarik data...' : 'Tarik Data dari Sheets'}
+                  {isSyncing ? 'Menarik data...' : dbMode === 'supabase' ? 'Tarik dari Supabase' : 'Tarik dari Google Sheets'}
                 </button>
+
+                {dbMode === 'supabase' && googleSheetsUrl && (
+                  <button
+                    onClick={handleMigrateSheetsToSupabase}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-[#E5E5D8] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs border border-indigo-700"
+                  >
+                    <Database className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Memindahkan...' : 'Migrasi: Sheets ➔ Supabase'}
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     resetAllFilters();
@@ -1434,13 +2211,15 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   <RefreshCw className="w-3.5 h-3.5" />
                   Refresh & Reset
                 </button>
-                <button
-                  onClick={() => setShowCodeModal(true)}
-                  className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-[#0C2B64]" />
-                  Kode Apps Script
-                </button>
+                {dbMode !== 'supabase' && (
+                  <button
+                    onClick={() => setShowCodeModal(true)}
+                    className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-3 py-2 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer shadow-xs"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-[#0C2B64]" />
+                    Kode Apps Script
+                  </button>
+                )}
                 <button
                   onClick={() => exportToCSV(students)}
                   disabled={students.length === 0}
@@ -1922,13 +2701,14 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
 
       {/* DEVELOPER MODAL */}
       {showDevPrompt && (
-        <div className="fixed inset-0 z-50 bg-[#33332D]/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-[#33332D]/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+          <div className="bg-white border border-[#D6D6C2] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative my-8">
             <button
               onClick={() => {
                 setShowDevPrompt(false);
                 setInputDevPassword('');
                 setDevPasswordError('');
+                setConnectionTestResult(null);
               }}
               disabled={isVerifyingDev}
               className="absolute top-4 right-4 text-[#8A8A70] hover:text-[#33332D] font-bold text-sm bg-[#F5F5F0] hover:bg-[#E5E5D8] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
@@ -1944,16 +2724,138 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                 Verifikasi Akses Developer
               </h3>
               <p className="text-xs text-[#8A8A70]">
-                Masukkan email dan password untuk mengaktifkan Modul Integrasi.
+                Konfigurasi database dan verifikasi akses untuk mengaktifkan Modul Integrasi.
               </p>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed">
-              <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
-              Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
+            {/* Database Selector / Mode Switcher */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
+                Pilih Mode Database Aktif:
+              </label>
+              <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-xl p-1 flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDbMode('sheets');
+                    setConnectionTestResult(null);
+                  }}
+                  className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    dbMode === 'sheets'
+                      ? 'bg-[#0C2B64] text-white shadow-xs'
+                      : 'text-[#8A8A70] hover:text-[#33332D]'
+                  }`}
+                >
+                  Google Sheets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDbMode('supabase');
+                    setConnectionTestResult(null);
+                  }}
+                  className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    dbMode === 'supabase'
+                      ? 'bg-[#0C2B64] text-white shadow-xs'
+                      : 'text-[#8A8A70] hover:text-[#33332D]'
+                  }`}
+                >
+                  Supabase DB
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleDevUnlockSubmit} className="space-y-4">
+            {/* Config Fields depending on selected Mode */}
+            {dbMode === 'supabase' ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3.5 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-slate-800 uppercase font-mono tracking-wider">
+                    ⚙️ Konfigurasi Supabase:
+                  </span>
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold font-mono border ${
+                    isSupabaseConfigured() 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
+                    {isSupabaseConfigured() ? 'Terkonfigurasi ✓' : 'Belum Konfigurasi'}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                      Supabase URL:
+                    </label>
+                    <input
+                      type="text"
+                      value={supabaseUrl}
+                      onChange={(e) => setSupabaseUrl(e.target.value)}
+                      placeholder="https://xxxx.supabase.co"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                      Supabase Anon Key:
+                    </label>
+                    <input
+                      type="password"
+                      value={supabaseAnonKey}
+                      onChange={(e) => setSupabaseAnonKey(e.target.value)}
+                      placeholder="eyJhbGciOi..."
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Test Connection Button */}
+                <button
+                  type="button"
+                  onClick={() => handleTestSupabaseConnection()}
+                  disabled={isTestingConnection}
+                  className="w-full bg-slate-800 hover:bg-slate-950 text-white py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+                >
+                  {isTestingConnection ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Sedang Menguji Koneksi...
+                    </>
+                  ) : (
+                    '🔌 Uji & Deteksi Koneksi'
+                  )}
+                </button>
+
+                {/* Connection Test Outcome */}
+                {connectionTestResult && (
+                  <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
+                    connectionTestResult.success
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                  }`}>
+                    <div className="font-bold flex items-center gap-1.5 mb-1">
+                      {connectionTestResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      )}
+                      {connectionTestResult.message}
+                    </div>
+                    {connectionTestResult.details && (
+                      <p className="text-[10px] opacity-90 font-mono whitespace-pre-wrap leading-tight mt-1 bg-white/50 p-1.5 rounded border border-black/5 max-h-24 overflow-y-auto">
+                        {connectionTestResult.details}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed">
+                <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
+                Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
+              </div>
+            )}
+
+            <form onSubmit={handleDevUnlockSubmit} className="space-y-4 text-left">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
                   Email Developer:
@@ -1962,7 +2864,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   type="email"
                   value={inputDevEmail}
                   onChange={(e) => setInputDevEmail(e.target.value)}
-                  placeholder="Masukkan email dari sheet developer"
+                  placeholder="Masukkan email dari database / sheet"
                   disabled={isVerifyingDev}
                   autoFocus
                   className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
@@ -1977,7 +2879,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                   type="password"
                   value={inputDevPassword}
                   onChange={(e) => setInputDevPassword(e.target.value)}
-                  placeholder="Masukkan password dari sheet developer"
+                  placeholder="Masukkan password dari database / sheet"
                   disabled={isVerifyingDev}
                   className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
                 />
@@ -1990,7 +2892,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </div>
 
               <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-3 text-[11px] text-[#0C2B64] leading-relaxed">
-                <strong>🔒 Informasi:</strong> Hanya data di sheet <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developer</code> yang berlaku.
+                <strong>🔒 Informasi:</strong> Hanya data di sheet / tabel <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developers</code> yang berlaku.
               </div>
 
               <div className="flex gap-2">
@@ -2000,16 +2902,17 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
                     setShowDevPrompt(false);
                     setInputDevPassword('');
                     setDevPasswordError('');
+                    setConnectionTestResult(null);
                   }}
                   disabled={isVerifyingDev}
-                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center disabled:opacity-50"
+                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center disabled:opacity-50 shadow-sm"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isVerifyingDev}
-                  className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
+                  className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
                   {isVerifyingDev ? (
                     <>

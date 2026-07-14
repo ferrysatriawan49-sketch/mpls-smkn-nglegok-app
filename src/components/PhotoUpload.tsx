@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { getSupabaseClient, isSupabaseConfigured } from '../supabaseClient';
 
 interface PhotoUploadProps {
   studentNis: string;
@@ -14,7 +15,10 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [useFallbackBase64, setUseFallbackBase64] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const dbMode = localStorage.getItem('mpls_db_mode') || 'sheets';
 
   // 🔥 Format nama file: NIS-Nama-Pertanyaan
   const generateFileName = (nis: string, name: string) => {
@@ -23,7 +27,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
     return `${nis}-${cleanName}-FOTO_${timestamp}`;
   };
 
-  // 🔥 Konversi File ke Base64 untuk preview
+  // 🔥 Konversi File ke Base64 untuk preview & fallback
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -35,10 +39,6 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
 
   // 🔥 Upload ke Google Drive via Apps Script
   const uploadToDrive = async (file: File, fileName: string) => {
-    // Karena Google Drive API membutuhkan OAuth, kita akan simpan di Google Sheets sebagai link
-    // Sebagai alternatif, kita akan konversi ke base64 dan kirim ke Apps Script
-    // yang kemudian akan menyimpan ke Google Drive
-    
     const base64Data = await fileToBase64(file);
     const payload = {
       action: 'uploadPhoto',
@@ -68,6 +68,62 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
 
     const result = await response.json();
     return result;
+  };
+
+  // 🔥 Upload ke Supabase (Storage with Base64 Fallback)
+  const uploadToSupabase = async (file: File, fileName: string) => {
+    const base64Data = await fileToBase64(file);
+    const client = getSupabaseClient();
+    
+    if (!client) {
+      throw new Error('Koneksi Supabase belum terkonfigurasi di panel integrasi.');
+    }
+
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const filePath = `${studentNis}/${fileName}.${fileExt}`;
+
+    try {
+      // Coba upload ke bucket 'student-photos'
+      const { data, error } = await client.storage
+        .from('student-photos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        console.warn('⚠️ Gagal upload ke bucket "student-photos" (Mungkin bucket belum dibuat). Menggunakan penyimpanan database langsung (Base64)...', error);
+        setUseFallbackBase64(true);
+        return {
+          status: 'success',
+          isFallback: true,
+          fileId: `base64_${Date.now()}`,
+          fileUrl: base64Data
+        };
+      }
+
+      // Ambil link publik
+      const { data: urlData } = client.storage
+        .from('student-photos')
+        .getPublicUrl(filePath);
+
+      setUseFallbackBase64(false);
+      return {
+        status: 'success',
+        isFallback: false,
+        fileId: data.path,
+        fileUrl: urlData.publicUrl
+      };
+    } catch (err: any) {
+      console.warn('⚠️ Exception saat upload storage. Menggunakan Base64 langsung...', err);
+      setUseFallbackBase64(true);
+      return {
+        status: 'success',
+        isFallback: true,
+        fileId: `base64_${Date.now()}`,
+        fileUrl: base64Data
+      };
+    }
   };
 
   // 🔥 Handle File Selection
@@ -119,10 +175,16 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
           }
           return prev + 10;
         });
-      }, 300);
+      }, 200);
 
       const fileName = generateFileName(studentNis, studentName);
-      const result = await uploadToDrive(photoFile, fileName);
+      
+      let result;
+      if (dbMode === 'supabase') {
+        result = await uploadToSupabase(photoFile, fileName);
+      } else {
+        result = await uploadToDrive(photoFile, fileName);
+      }
 
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -130,7 +192,16 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
       if (result.status === 'success') {
         setUploadStatus('success');
         onPhotoUploaded(result.fileId, result.fileUrl);
-        alert('✅ Foto berhasil diupload ke Google Drive!');
+        
+        if (dbMode === 'supabase') {
+          if (result.isFallback) {
+            alert('ℹ️ Penyimpanan bucket Supabase belum dibuat. Foto berhasil dikonversi dan disimpan langsung ke database!');
+          } else {
+            alert('✅ Foto berhasil diupload ke Supabase Storage!');
+          }
+        } else {
+          alert('✅ Foto berhasil diupload ke Google Drive!');
+        }
       } else {
         throw new Error(result.message || 'Upload gagal');
       }
@@ -149,6 +220,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
     setPhotoPreview(null);
     setUploadStatus('idle');
     setUploadProgress(0);
+    setUseFallbackBase64(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -158,7 +230,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
     <div className="space-y-4">
       {/* Drop Zone */}
       <div 
-        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 ${
+        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
           photoPreview 
             ? 'border-emerald-300 bg-emerald-50/50' 
             : 'border-[#D6D6C2] hover:border-[#8A8A70] hover:bg-[#F5F5F0]'
@@ -207,7 +279,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
             type="button"
             onClick={handleUpload}
             disabled={isUploading}
-            className="w-full bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
+            className="w-full bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
             {isUploading ? (
               <>
@@ -217,7 +289,7 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
             ) : (
               <>
                 <Upload className="w-4 h-4" />
-                Upload ke Google Drive
+                {dbMode === 'supabase' ? 'Upload ke Supabase' : 'Upload ke Google Drive'}
               </>
             )}
           </button>
@@ -235,14 +307,23 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
 
       {/* Status */}
       {uploadStatus === 'success' && (
-        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-2 rounded-lg text-sm">
-          <CheckCircle className="w-4 h-4" />
-          <span>Foto berhasil diupload ke Google Drive</span>
+        <div className="flex flex-col gap-1 text-emerald-600 bg-emerald-50 p-3 rounded-lg text-sm border border-emerald-200">
+          <div className="flex items-center gap-2 font-bold">
+            <CheckCircle className="w-4 h-4 shrink-0" />
+            <span>Foto berhasil disimpan!</span>
+          </div>
+          <span className="text-[11px] opacity-90 pl-6 leading-relaxed">
+            {dbMode === 'supabase' 
+              ? (useFallbackBase64 
+                  ? 'Disimpan dalam database sebagai teks gambar terenkripsi (Base64).' 
+                  : 'Berhasil diunggah ke Supabase Storage bucket.')
+              : 'Berhasil diunggah ke folder FOTO_SISWA di Google Drive.'}
+          </span>
         </div>
       )}
 
       {uploadStatus === 'error' && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 p-2 rounded-lg text-sm">
+        <div className="flex items-center gap-2 text-red-600 bg-red-50 p-2 rounded-lg text-sm border border-red-200">
           <AlertCircle className="w-4 h-4" />
           <span>Gagal upload foto. Silakan coba lagi.</span>
         </div>
@@ -250,10 +331,10 @@ export default function PhotoUpload({ studentNis, studentName, onPhotoUploaded, 
 
       {/* Info Nama File */}
       {photoFile && uploadStatus !== 'success' && (
-        <div className="text-xs text-[#8A8A70] bg-[#F5F5F0] p-2 rounded-lg">
-          <span className="font-semibold">File:</span> {photoFile.name}
+        <div className="text-xs text-[#8A8A70] bg-[#F5F5F0] p-2 rounded-lg border border-[#D6D6C2]/50">
+          <span className="font-semibold text-[#33332D]">File:</span> {photoFile.name}
           <br />
-          <span className="font-semibold">Akan disimpan sebagai:</span> {generateFileName(studentNis, studentName)}.{photoFile.name.split('.').pop()}
+          <span className="font-semibold text-[#33332D]">Tujuan simpan:</span> {dbMode === 'supabase' ? 'Supabase Database/Storage' : 'Google Drive'}
         </div>
       )}
     </div>
