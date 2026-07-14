@@ -195,14 +195,6 @@ export default function App() {
   // 🔥 AUTO-FETCH DATA DARI GOOGLE SHEETS
   // ============================================================
   useEffect(() => {
-    const hasLoaded = localStorage.getItem('mpls_initial_load_done');
-    
-    if (hasLoaded === 'true') {
-      console.log('ℹ️ Data sudah pernah dimuat, skip auto-fetch');
-      setIsLoading(false);
-      return;
-    }
-
     const autoFetchData = async () => {
       setIsLoading(true);
       
@@ -1632,7 +1624,7 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
       <div className="min-h-screen bg-[#FDFCF8] flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0C2B64] mx-auto"></div>
-          <p className="text-sm text-[#8A8A70]">Memuat data dari Google Sheets...</p>
+          <p className="text-sm text-[#8A8A70]">Memuat data dari {dbMode === 'supabase' ? 'Supabase DB' : 'Google Sheets'}...</p>
         </div>
       </div>
     );
@@ -2728,203 +2720,223 @@ const handleSaveStudentAnswers = (answers: Record<string, any>, isSubmitted: boo
               </p>
             </div>
 
-            {/* Database Selector / Mode Switcher */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
-                Pilih Mode Database Aktif:
-              </label>
-              <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-xl p-1 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDbMode('sheets');
-                    setConnectionTestResult(null);
-                  }}
-                  className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    dbMode === 'sheets'
-                      ? 'bg-[#0C2B64] text-white shadow-xs'
-                      : 'text-[#8A8A70] hover:text-[#33332D]'
-                  }`}
-                >
-                  Google Sheets
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDbMode('supabase');
-                    setConnectionTestResult(null);
-                  }}
-                  className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    dbMode === 'supabase'
-                      ? 'bg-[#0C2B64] text-white shadow-xs'
-                      : 'text-[#8A8A70] hover:text-[#33332D]'
-                  }`}
-                >
-                  Supabase DB
-                </button>
-              </div>
-            </div>
-
-            {/* Config Fields depending on selected Mode */}
-            {dbMode === 'supabase' ? (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3.5 text-left">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold text-slate-800 uppercase font-mono tracking-wider">
-                    ⚙️ Konfigurasi Supabase:
-                  </span>
-                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold font-mono border ${
-                    isSupabaseConfigured() 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                  }`}>
-                    {isSupabaseConfigured() ? 'Terkonfigurasi ✓' : 'Belum Konfigurasi'}
-                  </span>
+            {/* Conditionally render Config vs Login based on developer mode status */}
+            {isDevUnlocked ? (
+              <div className="space-y-4 animate-fade-in">
+                {/* Database Selector / Mode Switcher */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
+                    Pilih Mode Database Aktif:
+                  </label>
+                  <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-xl p-1 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbMode('sheets');
+                        setConnectionTestResult(null);
+                      }}
+                      className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        dbMode === 'sheets'
+                          ? 'bg-[#0C2B64] text-white shadow-xs'
+                          : 'text-[#8A8A70] hover:text-[#33332D]'
+                      }`}
+                    >
+                      Google Sheets
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbMode('supabase');
+                        setConnectionTestResult(null);
+                      }}
+                      className={`flex-1 text-center py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        dbMode === 'supabase'
+                          ? 'bg-[#0C2B64] text-white shadow-xs'
+                          : 'text-[#8A8A70] hover:text-[#33332D]'
+                      }`}
+                    >
+                      Supabase DB
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                      Supabase URL:
+                {/* Config Fields depending on selected Mode */}
+                {dbMode === 'supabase' ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3.5 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold text-slate-800 uppercase font-mono tracking-wider">
+                        ⚙️ Konfigurasi Supabase:
+                      </span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold font-mono border ${
+                        isSupabaseConfigured() 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {isSupabaseConfigured() ? 'Terkonfigurasi ✓' : 'Belum Konfigurasi'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          Supabase URL:
+                        </label>
+                        <input
+                          type="text"
+                          value={supabaseUrl}
+                          onChange={(e) => setSupabaseUrl(e.target.value)}
+                          placeholder="https://xxxx.supabase.co"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          Supabase Anon Key:
+                        </label>
+                        <input
+                          type="password"
+                          value={supabaseAnonKey}
+                          onChange={(e) => setSupabaseAnonKey(e.target.value)}
+                          placeholder="eyJhbGciOi..."
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Test Connection Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleTestSupabaseConnection()}
+                      disabled={isTestingConnection}
+                      className="w-full bg-slate-800 hover:bg-slate-950 text-white py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+                    >
+                      {isTestingConnection ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Sedang Menguji Koneksi...
+                        </>
+                      ) : (
+                        '🔌 Uji & Deteksi Koneksi'
+                      )}
+                    </button>
+
+                    {/* Connection Test Outcome */}
+                    {connectionTestResult && (
+                      <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
+                        connectionTestResult.success
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border-rose-200 text-rose-800'
+                      }`}>
+                        <div className="font-bold flex items-center gap-1.5 mb-1">
+                          {connectionTestResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          )}
+                          {connectionTestResult.message}
+                        </div>
+                        {connectionTestResult.details && (
+                          <p className="text-[10px] opacity-90 font-mono whitespace-pre-wrap leading-tight mt-1 bg-white/50 p-1.5 rounded border border-black/5 max-h-24 overflow-y-auto">
+                            {connectionTestResult.details}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 text-xs text-amber-800 leading-relaxed text-left">
+                    <strong>ℹ️ INFORMASI:</strong> Database aktif saat ini menggunakan <strong>Google Sheets</strong>.<br />
+                    Anda dapat mengonfigurasi URL Web App Google Sheets di panel Modul Integrasi di dashboard utama.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowDevPrompt(false)}
+                  className="w-full bg-[#0C2B64] hover:bg-[#081F48] text-white py-2.5 rounded-lg text-xs font-bold transition-colors cursor-pointer text-center shadow-xs"
+                >
+                  Selesai & Tutup
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed text-left">
+                  <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
+                  Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
+                </div>
+
+                <form onSubmit={handleDevUnlockSubmit} className="space-y-4 text-left">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
+                      Email Developer:
                     </label>
                     <input
-                      type="text"
-                      value={supabaseUrl}
-                      onChange={(e) => setSupabaseUrl(e.target.value)}
-                      placeholder="https://xxxx.supabase.co"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                      type="email"
+                      value={inputDevEmail}
+                      onChange={(e) => setInputDevEmail(e.target.value)}
+                      placeholder="Masukkan email dari database / sheet"
+                      disabled={isVerifyingDev}
+                      autoFocus
+                      className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                      Supabase Anon Key:
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
+                      Password Developer:
                     </label>
                     <input
                       type="password"
-                      value={supabaseAnonKey}
-                      onChange={(e) => setSupabaseAnonKey(e.target.value)}
-                      placeholder="eyJhbGciOi..."
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-[#33332D] focus:outline-none focus:ring-1 focus:ring-slate-500 font-mono"
+                      value={inputDevPassword}
+                      onChange={(e) => setInputDevPassword(e.target.value)}
+                      placeholder="Masukkan password dari database / sheet"
+                      disabled={isVerifyingDev}
+                      className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
                     />
-                  </div>
-                </div>
-
-                {/* Test Connection Button */}
-                <button
-                  type="button"
-                  onClick={() => handleTestSupabaseConnection()}
-                  disabled={isTestingConnection}
-                  className="w-full bg-slate-800 hover:bg-slate-950 text-white py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
-                >
-                  {isTestingConnection ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Sedang Menguji Koneksi...
-                    </>
-                  ) : (
-                    '🔌 Uji & Deteksi Koneksi'
-                  )}
-                </button>
-
-                {/* Connection Test Outcome */}
-                {connectionTestResult && (
-                  <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
-                    connectionTestResult.success
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                      : 'bg-rose-50 border-rose-200 text-rose-800'
-                  }`}>
-                    <div className="font-bold flex items-center gap-1.5 mb-1">
-                      {connectionTestResult.success ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      )}
-                      {connectionTestResult.message}
-                    </div>
-                    {connectionTestResult.details && (
-                      <p className="text-[10px] opacity-90 font-mono whitespace-pre-wrap leading-tight mt-1 bg-white/50 p-1.5 rounded border border-black/5 max-h-24 overflow-y-auto">
-                        {connectionTestResult.details}
+                    {devPasswordError && (
+                      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        {devPasswordError}
                       </p>
                     )}
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed">
-                <strong>⚠️ PERHATIAN!</strong> Password default (admin123) SUDAH TIDAK BERLAKU.<br />
-                Gunakan email dan password yang tersimpan di sheet <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">developer</code> Google Sheets Anda.
-              </div>
+
+                  <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-3 text-[11px] text-[#0C2B64] leading-relaxed">
+                    <strong>🔒 Informasi:</strong> Hanya data di sheet / tabel <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developers</code> yang berlaku.
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDevPrompt(false);
+                        setInputDevPassword('');
+                        setDevPasswordError('');
+                        setConnectionTestResult(null);
+                      }}
+                      disabled={isVerifyingDev}
+                      className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center disabled:opacity-50 shadow-sm"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isVerifyingDev}
+                      className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
+                    >
+                      {isVerifyingDev ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Verifikasi...
+                        </>
+                      ) : (
+                        'Masuk Developer'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </>
             )}
-
-            <form onSubmit={handleDevUnlockSubmit} className="space-y-4 text-left">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
-                  Email Developer:
-                </label>
-                <input
-                  type="email"
-                  value={inputDevEmail}
-                  onChange={(e) => setInputDevEmail(e.target.value)}
-                  placeholder="Masukkan email dari database / sheet"
-                  disabled={isVerifyingDev}
-                  autoFocus
-                  className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-[#0C2B64] uppercase tracking-wider font-mono">
-                  Password Developer:
-                </label>
-                <input
-                  type="password"
-                  value={inputDevPassword}
-                  onChange={(e) => setInputDevPassword(e.target.value)}
-                  placeholder="Masukkan password dari database / sheet"
-                  disabled={isVerifyingDev}
-                  className="w-full bg-[#FDFCF8] border border-[#D6D6C2] rounded-lg px-4 py-2.5 text-sm text-[#33332D] focus:outline-none focus:ring-1 focus:ring-[#0C2B64] disabled:opacity-60"
-                />
-                {devPasswordError && (
-                  <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    {devPasswordError}
-                  </p>
-                )}
-              </div>
-
-              <div className="bg-[#F5F5F0] border border-[#D6D6C2] rounded-lg p-3 text-[11px] text-[#0C2B64] leading-relaxed">
-                <strong>🔒 Informasi:</strong> Hanya data di sheet / tabel <code className="bg-[#E5E5D8] px-1 py-0.5 rounded font-mono font-bold">developers</code> yang berlaku.
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDevPrompt(false);
-                    setInputDevPassword('');
-                    setDevPasswordError('');
-                    setConnectionTestResult(null);
-                  }}
-                  disabled={isVerifyingDev}
-                  className="flex-1 bg-white hover:bg-[#F5F5F0] border border-[#D6D6C2] px-4 py-2.5 rounded-lg text-xs font-bold text-[#0C2B64] transition-colors cursor-pointer text-center disabled:opacity-50 shadow-sm"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isVerifyingDev}
-                  className="flex-1 bg-[#0C2B64] hover:bg-[#081F48] disabled:bg-[#8A8A70] text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
-                >
-                  {isVerifyingDev ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Verifikasi...
-                    </>
-                  ) : (
-                    'Buka Kunci'
-                  )}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
