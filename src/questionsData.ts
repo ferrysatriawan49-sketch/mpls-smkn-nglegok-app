@@ -157,7 +157,7 @@ const QUESTIONS_1_TO_70: Question[] = [
   { id: 'q23', number: 23, text: 'Pekerjaan Ibu', type: 'text', required: true, minLength: 2, maxLength: 60 },
   { id: 'q24', number: 24, text: 'Penghasilan Rata-rata Ibu per Bulan', type: 'select', required: true, options: PENGHASILAN_OPTIONS },
   { 
-    id: 'q19_ibu',
+    id: 'q25',
     number: 25, 
     text: 'Nomor Telepon (WhatsApp) Ibu (Awalan 62)', 
     type: 'text', 
@@ -426,7 +426,7 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q52_1', 
+    id: 'q52', 
     number: 52, 
     text: 'Ekstrakurikuler apa yang ingin Anda ikuti? (Pilih maksimal 2)', 
     type: 'multiselect', 
@@ -460,8 +460,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q52_2', 
-    number: 52,
+    id: 'q53', 
+    number: 53,
     text: 'Apa yang memotivasi Anda untuk meraih prestasi? (Pilih maksimal 2)', 
     type: 'multiselect', 
     required: true,
@@ -479,8 +479,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q53', 
-    number: 53, 
+    id: 'q54', 
+    number: 54, 
     text: 'Apakah Anda bersedia mengikuti pembinaan atau pelatihan secara intensif?', 
     type: 'select', 
     required: true,
@@ -492,8 +492,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q54', 
-    number: 54, 
+    id: 'q55', 
+    number: 55, 
     text: 'Dukungan apa yang Anda miliki untuk mengembangkan bakat dan meraih prestasi?', 
     type: 'multiselect', 
     required: true,
@@ -510,8 +510,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q55', 
-    number: 55, 
+    id: 'q56', 
+    number: 56, 
     text: 'Jarak Rumah ke Sekolah', 
     type: 'select', 
     required: true,
@@ -522,8 +522,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q56', 
-    number: 56, 
+    id: 'q57', 
+    number: 57, 
     text: 'Transportasi Utama ke Sekolah', 
     type: 'select', 
     required: true,
@@ -535,14 +535,14 @@ const QUESTIONS_1_TO_70: Question[] = [
       { value: 'Ngekos', label: 'Ngekos / Tinggal di Dekat Sekolah' }
     ]
   },
-  { id: 'q57', number: 57, text: 'Nama Sekolah Asal (SMP/MTs)', type: 'text', required: true, minLength: 5, maxLength: 25 },
-  { id: 'q58', number: 58, text: 'Mata Pelajaran yang Paling Tidak Disukai di SMP/MTs', type: 'text', required: true, minLength: 5, maxLength: 25 },
-  { id: 'q59', number: 59, text: 'Mata Pelajaran yang Paling Dikuasai di SMP/MTs', type: 'text', required: true, minLength: 5, maxLength: 25 },
-  { id: 'q60', number: 60, text: 'Frekuensi Terlambat Masuk Sekolah di SMP/MTs (1 = Tidak pernah, 4 = Selalu terlambat)', type: 'rating', required: true },
-  { id: 'q61', number: 61, text: 'Frekuensi Mendapat Hukuman di SMP/MTs (1 = Tidak pernah, 4 = Sangat sering)', type: 'rating', required: true },
+  { id: 'q58', number: 58, text: 'Nama Sekolah Asal (SMP/MTs)', type: 'text', required: true, minLength: 5, maxLength: 25 },
+  { id: 'q59', number: 59, text: 'Mata Pelajaran yang Paling Tidak Disukai di SMP/MTs', type: 'text', required: true, minLength: 5, maxLength: 25 },
+  { id: 'q60', number: 60, text: 'Mata Pelajaran yang Paling Dikuasai di SMP/MTs', type: 'text', required: true, minLength: 5, maxLength: 25 },
+  { id: 'q61', number: 61, text: 'Frekuensi Terlambat Masuk Sekolah di SMP/MTs (1 = Tidak pernah, 4 = Selalu terlambat)', type: 'rating', required: true },
+  { id: 'q62', number: 62, text: 'Frekuensi Mendapat Hukuman di SMP/MTs (1 = Tidak pernah, 4 = Sangat sering)', type: 'rating', required: true },
   { 
-    id: 'q62', 
-    number: 62, 
+    id: 'q63', 
+    number: 63, 
     text: 'Alasan Memilih Bersekolah di SMKN 1 Nglegok', 
     type: 'select', 
     required: true,
@@ -554,8 +554,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q63', 
-    number: 63, 
+    id: 'q64', 
+    number: 64, 
     text: 'Kesesuaian Jurusan dengan Minat Anda', 
     type: 'select', 
     required: true,
@@ -565,8 +565,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q64', 
-    number: 64, 
+    id: 'q65', 
+    number: 65, 
     text: 'Rencana Jika Jurusan Tidak Sesuai Minat', 
     type: 'select', 
     required: true,
@@ -577,8 +577,8 @@ const QUESTIONS_1_TO_70: Question[] = [
     ]
   },
   { 
-    id: 'q65', 
-    number: 65, 
+    id: 'q66', 
+    number: 66, 
     text: 'Rencana Utama Setelah Lulus SMK', 
     type: 'select', 
     required: true,
@@ -590,10 +590,10 @@ const QUESTIONS_1_TO_70: Question[] = [
       { value: 'Membantu Usaha Orang Tua', label: 'Membantu Usaha Orang Tua' }
     ]
   },
-  { id: 'q66', number: 66, text: 'Apakah Anda berminat mengikuti O2SN (Olimpiade Olahraga Siswa Nasional)?', type: 'select', required: true, options: [{ value: 'Iya', label: 'Iya' }, { value: 'Tidak', label: 'Tidak' }] },
-  { id: 'q67', number: 67, text: 'Apakah Anda berminat mengikuti FLS3N (Festival Lomba Seni dan Sastra Siswa Nasional)?', type: 'select', required: true, options: [{ value: 'Iya', label: 'Iya' }, { value: 'Tidak', label: 'Tidak' }] },
-  { id: 'q68', number: 68, text: 'Titik Koordinat Rumah Anda (GPS)', type: 'location', required: true }
-  // 🔥 Q69 dan Q70 DIHAPUS
+  { id: 'q67', number: 67, text: 'Apakah Anda berminat mengikuti O2SN (Olimpiade Olahraga Siswa Nasional)?', type: 'select', required: true, options: [{ value: 'Iya', label: 'Iya' }, { value: 'Tidak', label: 'Tidak' }] },
+  { id: 'q68', number: 68, text: 'Apakah Anda berminat mengikuti FLS3N (Festival Lomba Seni dan Sastra Siswa Nasional)?', type: 'select', required: true, options: [{ value: 'Iya', label: 'Iya' }, { value: 'Tidak', label: 'Tidak' }] },
+  { id: 'q69', number: 69, text: 'Titik Koordinat Rumah Anda (GPS)', type: 'location', required: true }
+  // 🔥 Q70 DIHAPUS
 ];
 
 // ============================================================
@@ -971,14 +971,14 @@ export const QUESTION_GROUPS: QuestionGroup[] = [
     title: 'Minat, Bakat & Prestasi',
     icon: 'Award',
     description: 'Pilihan minat belajar, musik, olahraga, karya tulis, dan target ekstrakurikuler serta motivasi berprestasi.',
-    questions: getQuestionsList().filter(q => (q.number >= 43 && q.number <= 54) || q.number === 66 || q.number === 67)
+    questions: getQuestionsList().filter(q => (q.number >= 43 && q.number <= 55) || q.number === 67 || q.number === 68)
   },
   {
     id: 'school_origin',
     title: 'Sekolah Asal & Adaptasi',
     icon: 'GraduationCap',
     description: 'Asal sekolah SMP/MTs, kebiasaan belajar, jarak rumah, transportasi, dan koordinat GPS rumah tinggal.',
-    questions: getQuestionsList().filter(q => (q.number >= 55 && q.number <= 65) || q.number === 68)
+    questions: getQuestionsList().filter(q => (q.number >= 56 && q.number <= 66) || q.number === 69)
   },
   {
     id: 'career_future',

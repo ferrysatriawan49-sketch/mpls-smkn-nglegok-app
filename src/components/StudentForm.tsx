@@ -3,6 +3,7 @@ import { Student, QuestionGroup, Question } from '../types';
 import { QUESTION_GROUPS, getQuestionsList } from '../questionsData';
 import { calculateProgressPercent, formatGPS } from '../utils';
 import { MapPicker } from './MapPicker';
+import { getSupabaseClient } from '../supabaseClient';
 import { 
   User, Users, Heart, Award, GraduationCap, Briefcase, 
   ArrowLeft, ArrowRight, Save, CheckCircle2, AlertCircle, 
@@ -225,6 +226,78 @@ function PhotoUpload({
 
   // 🔥 Handle Upload
   
+  // 🔥 Upload ke Supabase dengan Base64 Fallback yang Resilien
+  const uploadToSupabase = async (file: File, fileName: string) => {
+    try {
+      // 🔥 Kompres gambar
+      const finalBlob = await compressImage(file, 400, 400);
+
+      // 🔥 Buat Base64 Data URI untuk fallback
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(finalBlob);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Gagal konversi ke base64'));
+      });
+
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Koneksi database Supabase belum terkonfigurasi.');
+      }
+
+      const filePath = `${studentNis}/${fileName}`;
+      console.log('📤 Menghubungi Supabase Storage:', filePath);
+
+      const { data, error } = await client.storage
+        .from('student-photos')
+        .upload(filePath, finalBlob, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        console.warn('⚠️ Gagal upload ke bucket "student-photos", menggunakan fallback Base64...', error.message);
+        return {
+          status: 'success',
+          fileId: `base64_${Date.now()}`,
+          fileUrl: base64Data,
+          message: 'Disimpan sebagai data base64 (Storage belum aktif)'
+        };
+      }
+
+      const { data: urlData } = client.storage
+        .from('student-photos')
+        .getPublicUrl(filePath);
+
+      return {
+        status: 'success',
+        fileId: data.path,
+        fileUrl: urlData.publicUrl,
+        message: 'Disimpan di Supabase Storage'
+      };
+    } catch (err: any) {
+      console.warn('⚠️ Exception saat upload Supabase, fallback ke Base64...', err);
+      // Fallback ke Base64 langsung agar tidak pernah gagal
+      try {
+        const finalBlob = await compressImage(file, 400, 400);
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(finalBlob);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('Gagal konversi ke base64'));
+        });
+        return {
+          status: 'success',
+          fileId: `base64_${Date.now()}`,
+          fileUrl: base64Data,
+          message: 'Disimpan sebagai data base64'
+        };
+      } catch (innerErr: any) {
+        throw new Error(err.message || 'Gagal compress atau upload foto');
+      }
+    }
+  };
+
   // 🔥 Handle Upload - DIPERBAIKI DENGAN VERIFIKASI
   const handleUpload = async () => {
     if (!photoFile) {
@@ -252,16 +325,22 @@ function PhotoUpload({
       const fileName = generateFileName(studentNis, studentName, questionId, fileExt);
       console.log('📎 Generated filename:', fileName);
 
-      const result = await uploadToDrive(photoFile, fileName);
+      const dbMode = localStorage.getItem('mpls_db_mode') || 'sheets';
+      let result;
+
+      if (dbMode === 'supabase') {
+        result = await uploadToSupabase(photoFile, fileName);
+      } else {
+        result = await uploadToDrive(photoFile, fileName);
+      }
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
       if (result.status === 'success' && result.fileId) {
         setUploadStatus('success');
-        // 🔥 Gunakan fileId dan fileUrl DARI RESPONSE (bukan fake)
         onPhotoUploaded(result.fileId, result.fileUrl);
-        alert(`✅ Foto berhasil diupload ke Google Drive! ${result.message || ''}`);
+        alert(`✅ Foto berhasil diunggah! ${result.message || ''}`);
         console.log('✅ File ID:', result.fileId);
         console.log('✅ File URL:', result.fileUrl);
       } else {
@@ -355,7 +434,7 @@ function PhotoUpload({
             ) : (
               <>
                 <Upload className="w-4 h-4" />
-                Upload ke Google Drive
+                Unggah Foto
               </>
             )}
           </button>
@@ -425,21 +504,31 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
     initialAnswers.q1 = student.name;
     initialAnswers.q2 = student.nis;
 
+    // 🔥 Convert multiselect values (comma-separated strings) back into arrays
+    const questionsList = getQuestionsList();
+    questionsList.forEach(q => {
+      if (q.type === 'multiselect') {
+        const val = initialAnswers[q.id];
+        if (typeof val === 'string' && val) {
+          initialAnswers[q.id] = val.split(',').map(s => s.trim()).filter(Boolean);
+        } else if (!val) {
+          initialAnswers[q.id] = [];
+        }
+      }
+    });
+
     photoQuestions.forEach(qId => {
       const fileId = student.answers[`${qId}_file_id`] || '';
       const fileUrl = student.answers[`${qId}_file_url`] || student.answers[qId] || '';
       
-      if (fileId) {
+      if (fileUrl) {
         setPhotoStates(prev => ({
           ...prev,
           [qId]: {
-            fileId: fileId,
-            fileUrl: fileUrl || null
+            fileId: fileId || 'existing',
+            fileUrl: fileUrl
           }
         }));
-      }
-      
-      if (fileUrl) {
         initialAnswers[qId] = fileUrl;
         initialAnswers[`${qId}_file_url`] = fileUrl;
       }
@@ -662,7 +751,7 @@ export default function StudentForm({ student, onSave, onClose }: StudentFormPro
     });
     
     onSave(fullAnswers, false);
-    setSuccessMsg('✅ Draft pendaftaran berhasil disimpan dan disinkronkan ke Google Sheets!');
+    setSuccessMsg('✅ Draft pendaftaran berhasil disimpan dan disinkronkan database!');
     setTimeout(() => setSuccessMsg(null), 3000);
   };
 
