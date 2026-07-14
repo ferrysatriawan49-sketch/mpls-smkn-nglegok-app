@@ -31,11 +31,11 @@ export default function App() {
   });
 
   const [supabaseUrl, setSupabaseUrl] = useState(() => {
-    return (import.meta as any).env.VITE_SUPABASE_URL || localStorage.getItem('mpls_supabase_url') || '';
+    return (import.meta as any).env.VITE_SUPABASE_URL || localStorage.getItem('mpls_supabase_url') || 'https://nwywugpsucforoergrzj.supabase.co';
   });
   
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(() => {
-    return (import.meta as any).env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('mpls_supabase_anon_key') || '';
+    return (import.meta as any).env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('mpls_supabase_anon_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53eXd1Z3BzdWNmb3JvZXJncnpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTQwNzQsImV4cCI6MjA5OTU5MDA3NH0.vnCbrnPgnW73VzeG81c3NRuIw13-DmGcnC3x0pdnCec';
   });
 
   const [searchQuery, setSearchQuery] = useState('');
